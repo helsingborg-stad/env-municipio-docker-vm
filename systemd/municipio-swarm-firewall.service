@@ -1,0 +1,13 @@
+[Unit]
+Description=Restrict Municipio Swarm host port to local Caddy
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/scripts/swarm-firewall.municipio.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install static analysis dependency
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Check repository
+        run: make check
+

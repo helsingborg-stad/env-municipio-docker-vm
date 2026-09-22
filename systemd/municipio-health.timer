@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Municipio health evaluation
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=10s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+

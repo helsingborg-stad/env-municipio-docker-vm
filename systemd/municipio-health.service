@@ -1,0 +1,8 @@
+[Unit]
+Description=Municipio node health evaluation
+After=docker.service mariadb.service caddy.service
+
+[Service]
+Type=oneshot
+ExecStart=/scripts/health.municipio.sh
+

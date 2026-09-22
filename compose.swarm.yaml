@@ -1,0 +1,57 @@
+services:
+  municipio:
+    image: ${MUNICIPIO_IMAGE:?MUNICIPIO_IMAGE is required}
+    environment:
+      WP_CONF_DB_NAME: ${DB_NAME}
+      WP_CONF_DB_USER: ${DB_USER}
+      WP_CONF_DB_PASSWORD: ${DB_PASSWORD}
+      WP_CONF_DB_HOST: ${DB_HOST:-localhost:/run/mysqld/mysqld.sock}
+      WP_CONF_DB_TABLE_PREFIX: ${DB_TABLE_PREFIX:-mun_}
+      WP_CONF_WP_HOME: https://${SITE_ADDRESS}
+      WP_CONF_WP_SITEURL: https://${SITE_ADDRESS}/wp
+      WP_CONF_WP_SITE_TITLE: ${WP_SITE_TITLE:-Municipio}
+      WP_CONF_WP_ADMIN_USER: ${WP_ADMIN_USER}
+      WP_CONF_WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD}
+      WP_CONF_WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
+      WP_CONF_WP_DEBUG: ${WP_DEBUG:-false}
+      WP_CONF_WP_REDIS_DISABLED: ${WP_REDIS_DISABLED:-true}
+    ports:
+      - target: 80
+        published: ${APP_BIND_PORT:-8080}
+        protocol: tcp
+        mode: host
+    volumes:
+      - type: bind
+        source: /run/mysqld
+        target: /run/mysqld
+        read_only: true
+      - type: bind
+        source: ${INSTALL_ROOT}/runtime/config/content.php
+        target: /var/www/vhosts/localhost/html/config/content.php
+        read_only: true
+      - type: bind
+        source: ${DATA_ROOT}/uploads
+        target: /var/www/vhosts/localhost/html/wp-content/uploads
+      - type: bind
+        source: ${DATA_ROOT}/cache
+        target: /var/www/vhosts/localhost/html/wp-content/cache
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 60s
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.hostname == ${SWARM_NODE_HOSTNAME}
+      restart_policy:
+        condition: any
+        delay: 5s
+      update_config:
+        parallelism: 1
+        order: stop-first
+        monitor: 30s
+        failure_action: rollback

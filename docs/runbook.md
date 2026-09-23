@@ -82,6 +82,6 @@ sudo /scripts/backup.municipio.sh manual
 
 Local backups alone do not protect against VM or storage loss. Copy them to an independent backup target and regularly test restoration.
 
-## Change the public domain
+## Add or change a WordPress hostname
 
-Use the [domain-change guide](domain-change.md). The installed command performs a WP-CLI dry run, requires offline traffic and a fresh backup before changing stored URLs, and does not silently resume traffic after a failed step.
+Use the [site discovery guide](site-discovery.md). Change WordPress data and DNS/TLS separately; then run `sudo /scripts/refresh-sites.municipio.sh` on each data VM. The timer also polls for changes every minute. Check the generated host list and verify both nodes before sending round-robin traffic.

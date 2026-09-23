@@ -27,9 +27,9 @@ Set `DOCKER_SWARM=1` to use Swarm instead of Compose. It defaults to `0`. In a t
 
 Image tags are intentionally rejected by `update.municipio.sh`; production updates require a digest.
 
-`SITE_ADDRESS` is the public WordPress hostname. `CADDY_SITE_ADDRESS` controls Caddy's listener. Use the hostname when Caddy terminates TLS, or `:80` when an upstream HTTP load balancer terminates TLS and forwards plaintext traffic to the VM.
+`SITE_ADDRESS` is the initial/main WordPress hostname (and a temporary proxy seed until WordPress starts). It can be an IDN. WP-CLI discovers the actual Caddy host list thereafter. Set `CADDY_SITE_ADDRESS` equal to `SITE_ADDRESS` for Caddy-managed TLS, or `:80` when an upstream HTTP load balancer terminates TLS and forwards plaintext traffic to the VM. It is a TLS-mode switch, not an override for the host list.
 
-Changing these values on an installed site is a database migration, not just an env edit. Use the [domain-change procedure](domain-change.md); the force-SSL plugin does not replace an old hostname in stored WordPress data.
+Changing a site's domain in WordPress is a database/content migration, not just an env edit. The [site discovery procedure](site-discovery.md) explains how the resulting WordPress hostnames become Caddy routes; the force-SSL plugin does not replace old hostnames in stored content.
 
 ## Modes
 

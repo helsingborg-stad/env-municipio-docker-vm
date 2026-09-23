@@ -46,6 +46,7 @@ EOF
         fi
     fi
     packages=(rsync mariadb-client gzip tar util-linux)
+    [[ "$NODE_ROLE" == data ]] && packages+=(idn2 psl)
     if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
         packages+=(glusterfs-server glusterfs-client)
         [[ "$NODE_ROLE" == arbiter ]] && packages+=(galera-arbitrator-4)
@@ -68,6 +69,8 @@ if [[ "$NODE_ROLE" == data ]]; then
     [[ "$docker_ready" == true ]] || die 'Docker daemon is unavailable; inspect systemctl status docker.service and journalctl -u docker.service'
     docker compose version >/dev/null 2>&1 || die 'Docker Compose plugin is required'
     command -v caddy >/dev/null 2>&1 || die 'caddy is required'
+    command -v idn2 >/dev/null 2>&1 || die 'idn2 is required for WordPress hostname discovery'
+    command -v psl >/dev/null 2>&1 || die 'psl is required for apex-domain detection'
 fi
 
 install -d -m 0750 /etc/municipio "${INSTALL_ROOT:-/opt/municipio}" "${BACKUP_ROOT:-/var/backups/municipio}"

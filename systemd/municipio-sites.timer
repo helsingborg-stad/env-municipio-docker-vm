@@ -1,0 +1,10 @@
+[Unit]
+Description=Poll WordPress sites for Municipio Caddy
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+RandomizedDelaySec=5s
+
+[Install]
+WantedBy=timers.target

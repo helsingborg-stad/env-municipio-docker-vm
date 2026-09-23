@@ -46,6 +46,7 @@ case "$action" in
         fi
         deploy_application
         wait_for_application
+        /scripts/refresh-sites.municipio.sh
         /scripts/maintenance.municipio.sh off
         ;;
     join)
@@ -71,6 +72,7 @@ case "$action" in
             compose pull
             deploy_application
             wait_for_application
+            /scripts/refresh-sites.municipio.sh
             /scripts/maintenance.municipio.sh off
         fi
         ;;
@@ -85,6 +87,7 @@ case "$action" in
         docker node update --label-add municipio.data=true "$node_id"
         deploy_application
         wait_for_application
+        /scripts/refresh-sites.municipio.sh
         ;;
     status) /scripts/status.municipio.sh ;;
     restore-quorum)

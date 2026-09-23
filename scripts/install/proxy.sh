@@ -22,7 +22,7 @@ ${CADDY_SITE_ADDRESS:-$SITE_ADDRESS} {
     $(printf '%b' "$proxy_block")
 }
 EOF
-caddy validate --config "$tmp_caddy"
+caddy validate --config "$tmp_caddy" --adapter caddyfile
 if [[ ! -f /etc/caddy/Caddyfile ]] || ! cmp -s "$tmp_caddy" /etc/caddy/Caddyfile; then
     install -o root -g caddy -m 0644 "$tmp_caddy" /etc/caddy/Caddyfile
     systemctl enable caddy

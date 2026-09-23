@@ -8,10 +8,12 @@ while IFS= read -r file; do
     bash -n "$file"
 done < <(find bin scripts tests -type f -name '*.sh' -print)
 sh -n installer.sh
+bash -n uninstaller.sh
 
 if command -v shellcheck >/dev/null 2>&1; then
     find bin scripts tests -type f -name '*.sh' -print0 | xargs -0 shellcheck
     shellcheck -s sh installer.sh
+    shellcheck uninstaller.sh
 else
     echo 'SKIP: shellcheck is not installed'
 fi

@@ -56,6 +56,18 @@ For the short walkthrough, see [Quick start](docs/quick-start.md). Two-VM and Sw
 
 There is no in-place conversion. Back up, then install the containerized version on a fresh VM and restore. See [Runbook](docs/runbook.md#migrating-a-host-installed-node).
 
+## Uninstalling
+
+`uninstaller.sh` returns a VM to its pre-install state. Like the installer, it is downloaded and run on its own, with no clone needed:
+
+```bash
+curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/uninstaller.sh -o uninstaller.sh
+sudo sh uninstaller.sh        # asks for confirmation; --yes skips it
+sudo reboot
+```
+
+It removes the containers, Swarm membership, systemd units, firewall rules, Gluster volume, every Municipio directory, and Docker Engine with all of its data. The database, uploads and backups under `BACKUP_ROOT` are deleted, so copy anything you need off the VM first. Docker Engine is removed even if it was present before the install. Base packages such as `curl`, `tar` and `rsync` are kept. In cluster modes, run it on every node, including the arbitrator.
+
 ## Current maturity
 
 This is a reviewable version. Standalone installation is the first validation target. Cluster bootstrap and failover must be tested on disposable VMs before production use, especially firewall policy, Gluster healing, full-cluster restart, the Galera bootstrap flag lifecycle, and Municipio's behavior behind HTTPS.

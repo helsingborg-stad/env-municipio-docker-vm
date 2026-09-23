@@ -21,4 +21,11 @@ The generated settings are at `/etc/municipio/municipio.env`, readable only by r
 
 The download URL will work once the repository's `main` branch is publicly published. If you prefer a branded URL such as `https://install.getmunicipio.com`, serve the repository's `installer.sh` over HTTPS at that address. The bootstrap script downloads the source bundle from the GitHub `main` branch by default; for releases, publish a versioned archive and update its source URL before advertising the installer. Do not advertise a domain until it actually serves the reviewed script.
 
+To remove the installation and return the VM to its original state, download and run the uninstaller the same way. It deletes the database, uploads and backups, and removes Docker Engine; see [Uninstalling](../README.md#uninstalling).
+
+```bash
+curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/uninstaller.sh -o uninstaller.sh
+sudo sh uninstaller.sh
+```
+
 For a two-VM cluster, select `cluster-manual` or `cluster-arbitrator` and answer the additional peer questions on each VM. Both data VMs must be given identical database passwords, because a Galera state transfer replicates the privilege tables. The first install prepares services but cannot start a cluster alone. Once peers are ready, the wizard can bootstrap or join a node; Swarm workers also need a join token and a manager-side `enable-node` command. Follow the [cluster runbook](runbook.md) for the safe order, including `cluster.municipio.sh clear-bootstrap-flag` once the peer has joined. Swarm is an optional runtime choice in the same wizard.

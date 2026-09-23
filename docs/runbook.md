@@ -21,7 +21,7 @@ sudo /scripts/status.municipio.sh
 
 Choose `swarm` in the wizard to set `DOCKER_SWARM=1`. Standalone initializes a one-node Swarm. In a cluster, bootstrap initializes the preferred VM as manager and the secondary joins as a worker. See [Swarm mode](components/swarm.md) for the join sequence.
 
-The wizard refuses to overwrite an existing installed configuration. The lower-level `bin/install.sh --env-file` remains available for carefully reviewed reconfiguration from a local checkout; it is not the normal installation path.
+If an earlier run saved `/etc/municipio/municipio.env` but did not finish, run the downloaded installer again and confirm the resume prompt. It reuses the existing configuration without asking for credentials again. The lower-level `bin/install.sh --env-file` remains available for carefully reviewed reconfiguration from a local checkout; it is not the normal installation path.
 
 ## Initialize a two-node cluster
 

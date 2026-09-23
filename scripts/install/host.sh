@@ -12,7 +12,7 @@ if [[ "${INSTALL_PACKAGES:-true}" == true ]]; then
 
     if [[ "$NODE_ROLE" == data ]]; then
         data_packages=()
-        if ! command -v docker >/dev/null 2>&1; then
+        if ! command -v docker >/dev/null 2>&1 || ! systemctl cat docker.service >/dev/null 2>&1; then
             conflicts=()
             for package in docker.io docker-compose docker-compose-v2 docker-doc docker-buildx podman-docker containerd runc; do
                 dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed' && conflicts+=("$package")
@@ -55,6 +55,17 @@ fi
 
 if [[ "$NODE_ROLE" == data ]]; then
     command -v docker >/dev/null 2>&1 || die 'docker is required'
+    systemctl cat docker.service >/dev/null 2>&1 || die 'Docker Engine service is missing; the Docker CLI alone is not sufficient'
+    systemctl enable --now docker.service || die 'Could not start docker.service; inspect systemctl status docker.service and journalctl -u docker.service'
+    docker_ready=false
+    for ((attempt = 1; attempt <= 15; attempt++)); do
+        if docker info --format '{{.ServerVersion}}' >/dev/null 2>&1; then
+            docker_ready=true
+            break
+        fi
+        sleep 2
+    done
+    [[ "$docker_ready" == true ]] || die 'Docker daemon is unavailable; inspect systemctl status docker.service and journalctl -u docker.service'
     docker compose version >/dev/null 2>&1 || die 'Docker Compose plugin is required'
     command -v caddy >/dev/null 2>&1 || die 'caddy is required'
 fi

@@ -15,6 +15,8 @@ When it finishes, the application, local MariaDB, Caddy, and health timer are st
 sudo /scripts/status.municipio.sh
 ```
 
+If setup stops after saving the configuration, run `sudo sh installer.sh` again and choose **yes** to resume. A missing Docker socket usually means the Engine service did not start; check `sudo systemctl status docker.service` and `sudo journalctl -u docker.service` if the retry cannot start it.
+
 The generated settings are at `/etc/municipio/municipio.env`, readable only by root. If you let the wizard generate passwords, retrieve and store them securely from that file; the installer does not print them. To update the container image later, use `/scripts/update.municipio.sh` with an exact image digest.
 
 The download URL will work once the repository's `main` branch is publicly published. If you prefer a branded URL such as `https://install.getmunicipio.com`, serve the repository's `installer.sh` over HTTPS at that address. The bootstrap script downloads the source bundle from the GitHub `main` branch by default; for releases, publish a versioned archive and update its source URL before advertising the installer. Do not advertise a domain until it actually serves the reviewed script.

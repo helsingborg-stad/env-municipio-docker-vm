@@ -5,10 +5,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT_DIR/scripts/lib/platform.sh"
 [[ $EUID -eq 0 ]] || { echo 'Run as root: sudo bash bin/interactive-install.sh' >&2; exit 1; }
 [[ -r /dev/tty ]] || { echo 'An interactive terminal is required' >&2; exit 1; }
-[[ ! -e /etc/municipio/municipio.env ]] || {
-    echo 'Municipio is already configured. Review /etc/municipio/municipio.env before reinstalling.' >&2
-    exit 1
-}
 exec 3</dev/tty
 
 ask() {
@@ -56,6 +52,15 @@ secret() {
 
 random_secret() { openssl rand -hex 24; }
 write_value() { printf '%s=%q\n' "$1" "$2" >> "$config_file"; }
+
+if [[ -e /etc/municipio/municipio.env ]]; then
+    echo 'Existing Municipio configuration found at /etc/municipio/municipio.env.'
+    choice 'Resume installation using that configuration?' no 'yes no'
+    [[ "$REPLY" == yes ]] || exit 0
+    bash "$ROOT_DIR/bin/install.sh" --env-file /etc/municipio/municipio.env
+    /scripts/status.municipio.sh
+    exit 0
+fi
 
 detect_platform
 command -v openssl >/dev/null 2>&1 || {

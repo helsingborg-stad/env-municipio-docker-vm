@@ -17,6 +17,7 @@ The design deliberately has no database load balancer, shared database endpoint,
 ## Components
 
 - Caddy runs on the host and proxies only to the local Municipio container.
+- A local timer discovers WordPress site hostnames and refreshes an imported Caddyfile fragment.
 - Municipio runs from an immutable, digest-pinned Docker image.
 - MariaDB runs on the host. The container connects only to its own VM through a Unix socket.
 - Galera synchronizes databases in cluster modes.
@@ -25,7 +26,7 @@ The design deliberately has no database load balancer, shared database endpoint,
 - Maintenance commands are installed in `/scripts`.
 - `DOCKER_SWARM=1` runs one coordinated Swarm service across the data VMs, with one local application task per VM.
 
-See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md), [Docker Swarm mode](docs/components/swarm.md), [Host preparation](docs/components/host.md), [Network boundaries](docs/components/network.md), and the [Runbook](docs/runbook.md).
+See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md), [Docker Swarm mode](docs/components/swarm.md), [Host preparation](docs/components/host.md), [Network boundaries](docs/components/network.md), [WordPress site discovery](docs/site-discovery.md), and the [Runbook](docs/runbook.md).
 
 ## Quick start: standalone
 

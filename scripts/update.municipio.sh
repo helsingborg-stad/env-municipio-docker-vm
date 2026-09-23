@@ -52,6 +52,8 @@ if [[ "$update_ok" == false ]]; then
     die 'Update failed; previous image was restored where possible'
 fi
 
+/scripts/refresh-sites.municipio.sh
+
 if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
     find "${DATA_ROOT:?}/cache" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
 else

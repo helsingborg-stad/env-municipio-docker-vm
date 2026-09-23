@@ -13,7 +13,10 @@ When it finishes, the application, local MariaDB, Caddy, and health timer are st
 
 ```bash
 sudo /scripts/status.municipio.sh
+sudo /scripts/refresh-sites.municipio.sh
 ```
+
+The refresh command registers every installed WordPress site with Caddy (or the single site's home URL). It also runs automatically every minute. Apex domains get a `www.` alias; see [WordPress site discovery](site-discovery.md).
 
 If setup stops after saving the configuration, run `sudo sh installer.sh` again and choose **yes** to resume. A missing Docker socket usually means the Engine service did not start; check `sudo systemctl status docker.service` and `sudo journalctl -u docker.service` if the retry cannot start it.
 

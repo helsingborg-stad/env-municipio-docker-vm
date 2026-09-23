@@ -12,6 +12,6 @@ The selected release is pinned by OCI digest. The current example points to the 
 
 The container reaches the VM's native MariaDB through a read-only bind mount of `/run/mysqld` and a Unix socket connection. Persistent writable paths are bind-mounted from `DATA_ROOT`.
 
-Image `6.2.5` hardcodes `WP_CONTENT_URL` with `http://`. This repository bind-mounts `runtime/config/content.php` over that configuration file. The override derives the content URL from `WP_HOME` and marks requests as HTTPS when they arrive from the loopback-only Caddy proxy with `X-Forwarded-Proto: https`.
+The deployment does not replace the image's WordPress configuration. Municipio's force-SSL plugin handles HTTP references to public content, while `WP_HOME` and `WP_SITEURL` are configured with the public HTTPS address.
 
 In Compose mode, `update.municipio.sh` drains the local node, takes a backup, replaces only its application container, verifies health, and returns the node to service. It does not run `docker compose down`. In Swarm mode, run the command once on the manager: it updates the shared global service one task at a time across the data VMs.

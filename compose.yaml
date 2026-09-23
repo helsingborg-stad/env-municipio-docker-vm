@@ -21,7 +21,6 @@ services:
       - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_BIND_PORT:-8080}:80"
     volumes:
       - "/run/mysqld:/run/mysqld:ro"
-      - "${INSTALL_ROOT}/runtime/config/content.php:/var/www/vhosts/localhost/html/config/content.php:ro"
       - "${DATA_ROOT}/uploads:/var/www/vhosts/localhost/html/wp-content/uploads"
       - "${DATA_ROOT}/cache:/var/www/vhosts/localhost/html/wp-content/cache"
     healthcheck:

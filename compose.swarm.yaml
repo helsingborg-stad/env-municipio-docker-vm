@@ -26,10 +26,6 @@ services:
         target: /run/mysqld
         read_only: true
       - type: bind
-        source: ${INSTALL_ROOT}/runtime/config/content.php
-        target: /var/www/vhosts/localhost/html/config/content.php
-        read_only: true
-      - type: bind
         source: ${DATA_ROOT}/uploads
         target: /var/www/vhosts/localhost/html/wp-content/uploads
       - type: bind

@@ -5,10 +5,8 @@ load_config
 [[ "$NODE_ROLE" == data ]] || exit 0
 
 install -d -m 0755 "$INSTALL_ROOT"
-install -d -m 0755 "$INSTALL_ROOT/runtime/config"
 install -m 0644 "$MUNICIPIO_REPO_ROOT/compose.yaml" "$INSTALL_ROOT/compose.yaml"
 install -m 0644 "$MUNICIPIO_REPO_ROOT/compose.swarm.yaml" "$INSTALL_ROOT/compose.swarm.yaml"
-install -m 0644 "$MUNICIPIO_REPO_ROOT/runtime/config/content.php" "$INSTALL_ROOT/runtime/config/content.php"
 if [[ "$DOCKER_SWARM" == 1 ]]; then
     swarm_state="$(docker info --format '{{.Swarm.LocalNodeState}}')"
     if [[ "$DEPLOYMENT_MODE" == standalone && "$swarm_state" == inactive ]]; then

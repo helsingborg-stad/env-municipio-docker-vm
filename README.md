@@ -23,7 +23,6 @@ The design deliberately has no database load balancer, shared database endpoint,
 - GlusterFS synchronizes uploads and cache directories in cluster modes.
 - A health timer publishes `/healthz` only while the complete local node is usable.
 - Maintenance commands are installed in `/scripts`.
-- A documented runtime override fixes forwarded HTTPS and `WP_CONTENT_URL` behavior in image `6.2.5`.
 - `DOCKER_SWARM=1` runs one coordinated Swarm service across the data VMs, with one local application task per VM.
 
 See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md), [Docker Swarm mode](docs/components/swarm.md), [Host preparation](docs/components/host.md), [Network boundaries](docs/components/network.md), and the [Runbook](docs/runbook.md).

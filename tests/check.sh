@@ -16,12 +16,6 @@ else
     echo 'SKIP: shellcheck is not installed'
 fi
 
-if command -v php >/dev/null 2>&1; then
-    php -l runtime/config/content.php
-else
-    echo 'SKIP: php is not installed'
-fi
-
 if docker compose version >/dev/null 2>&1; then
     docker compose --env-file .env.example -f compose.yaml config >/dev/null
     set -a

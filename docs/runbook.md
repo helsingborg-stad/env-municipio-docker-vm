@@ -81,3 +81,7 @@ sudo /scripts/backup.municipio.sh manual
 ```
 
 Local backups alone do not protect against VM or storage loss. Copy them to an independent backup target and regularly test restoration.
+
+## Change the public domain
+
+Use the [domain-change guide](domain-change.md). The installed command performs a WP-CLI dry run, requires offline traffic and a fresh backup before changing stored URLs, and does not silently resume traffic after a failed step.

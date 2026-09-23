@@ -29,6 +29,8 @@ Image tags are intentionally rejected by `update.municipio.sh`; production updat
 
 `SITE_ADDRESS` is the public WordPress hostname. `CADDY_SITE_ADDRESS` controls Caddy's listener. Use the hostname when Caddy terminates TLS, or `:80` when an upstream HTTP load balancer terminates TLS and forwards plaintext traffic to the VM.
 
+Changing these values on an installed site is a database migration, not just an env edit. Use the [domain-change procedure](domain-change.md); the force-SSL plugin does not replace an old hostname in stored WordPress data.
+
 ## Modes
 
 `standalone` requires no peer settings.

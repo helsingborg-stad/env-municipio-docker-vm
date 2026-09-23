@@ -25,7 +25,7 @@ The design deliberately has no database load balancer, shared database endpoint,
 - Maintenance commands are installed in `/scripts`.
 - `DOCKER_SWARM=1` runs one coordinated Swarm service across the data VMs, with one local application task per VM.
 
-See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md), [Docker Swarm mode](docs/components/swarm.md), [Host preparation](docs/components/host.md), [Network boundaries](docs/components/network.md), and the [Runbook](docs/runbook.md).
+See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md), [Docker Swarm mode](docs/components/swarm.md), [Host preparation](docs/components/host.md), [Network boundaries](docs/components/network.md), the [Domain-change guide](docs/domain-change.md), and the [Runbook](docs/runbook.md).
 
 ## Quick start: standalone
 

@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
-source "${MUNICIPIO_REPO_ROOT}/scripts/lib/common.sh"
+source /usr/local/lib/municipio/common.sh
 load_config
 [[ "$NODE_ROLE" == data ]] || exit 0
+[[ $# -eq 0 || ( $# -eq 1 && "$1" == --no-start ) ]] || die 'Usage: configure-proxy.municipio.sh [--no-start]'
+start_service=true
+[[ "${1:-}" == --no-start ]] && start_service=false
+if [[ "$start_service" == false ]] && systemctl --quiet is-active caddy.service; then
+    die 'Stop caddy.service before staging a proxy configuration without starting it'
+fi
 
 install -d -o caddy -g caddy -m 0755 "${HEALTH_ROOT}"
 if [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == :80 ]]; then
@@ -25,8 +31,8 @@ EOF
 caddy validate --config "$tmp_caddy" --adapter caddyfile
 if [[ ! -f /etc/caddy/Caddyfile ]] || ! cmp -s "$tmp_caddy" /etc/caddy/Caddyfile; then
     install -o root -g caddy -m 0644 "$tmp_caddy" /etc/caddy/Caddyfile
+fi
+if [[ "$start_service" == true ]]; then
     systemctl enable caddy
     systemctl reload caddy 2>/dev/null || systemctl restart caddy
-else
-    systemctl enable --now caddy
 fi

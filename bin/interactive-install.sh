@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/lib/platform.sh"
 [[ $EUID -eq 0 ]] || { echo 'Run as root: sudo bash bin/interactive-install.sh' >&2; exit 1; }
 [[ -r /dev/tty ]] || { echo 'An interactive terminal is required' >&2; exit 1; }
 [[ ! -e /etc/municipio/municipio.env ]] || {
@@ -56,19 +57,12 @@ secret() {
 random_secret() { openssl rand -hex 24; }
 write_value() { printf '%s=%q\n' "$1" "$2" >> "$config_file"; }
 
-# shellcheck disable=SC1091
-source /etc/os-release
-[[ "${ID:-}" == ubuntu && "${VERSION_ID:-}" == 24.04 ]] || {
-    echo 'This installer supports Ubuntu Server 24.04 only.' >&2; exit 1;
-}
-[[ "$(dpkg --print-architecture)" == amd64 ]] || {
-    echo 'This installer requires amd64.' >&2; exit 1;
-}
+detect_platform
 command -v openssl >/dev/null 2>&1 || {
     echo 'openssl is required to generate credentials.' >&2; exit 1;
 }
 
-echo 'Municipio setup for Ubuntu Server 24.04'
+printf 'Municipio setup for %s %s (%s)\n' "$PLATFORM_ID" "$PLATFORM_VERSION" "$PLATFORM_CODENAME"
 echo 'Press Enter to accept defaults. Passwords will not be displayed.'
 choice 'Deployment' standalone 'standalone cluster-manual cluster-arbitrator'
 deployment_mode="$REPLY"

@@ -1,6 +1,6 @@
 # Municipio on a small VM fleet
 
-This repository installs and operates the Municipio container on one or two Ubuntu Server 24.04 LTS amd64 VMs. The default is a single self-contained VM. Optional cluster modes keep a local MariaDB and a local copy of persistent files on every data VM.
+This repository installs and operates the Municipio container on one or two amd64 Linux VMs. The installer accepts Ubuntu Server 22.04, 24.04, or 26.04 LTS, and Debian 12 or 13. The default is a single self-contained VM. Optional cluster modes keep a local MariaDB and a local copy of persistent files on every data VM.
 
 The design deliberately has no database load balancer, shared database endpoint, Kubernetes layer, or central file server.
 
@@ -29,7 +29,7 @@ See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md)
 
 ## Quick start: standalone
 
-On a fresh Ubuntu Server 24.04 LTS amd64 VM, download the installer and run it locally:
+On a fresh VM with one of the supported releases, download the installer and run it locally:
 
 ```bash
 curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh -o installer.sh

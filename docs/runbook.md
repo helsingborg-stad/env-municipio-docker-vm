@@ -2,12 +2,12 @@
 
 ## Before installation
 
-- Use Ubuntu Server 24.04 LTS on amd64.
+- Use Ubuntu Server 22.04, 24.04, or 26.04 LTS, or Debian 12 or 13, on amd64. Patch releases within those versions are accepted.
 - Point DNS at the VM for standalone, or at the HTTP load balancer for a cluster.
 - Permit ports 80/443 as appropriate.
 - Between cluster hosts permit MariaDB/Galera and Gluster traffic, but never expose it publicly.
 - When an upstream load balancer terminates TLS, set `CADDY_SITE_ADDRESS=:80`, preserve the public Host header, and send `X-Forwarded-Proto: https`.
-- Automatic package installation configures the official Docker and Caddy apt repositories. If conflicting Ubuntu Docker packages are already installed, remove or migrate them deliberately before running the installer. Alternatively set `INSTALL_PACKAGES=false` and preinstall all dependencies.
+- Automatic package installation configures the official Docker repository for the detected distribution and codename, plus Caddy's Debian/Ubuntu apt repository. If conflicting Docker packages are already installed, remove or migrate them deliberately before running the installer. Alternatively set `INSTALL_PACKAGES=false` and preinstall all dependencies.
 
 The exact port matrix is documented in [Network boundaries](components/network.md). MariaDB port 3306 stays local; only Galera and Gluster replication ports cross between VMs.
 
@@ -25,7 +25,7 @@ The wizard refuses to overwrite an existing installed configuration. The lower-l
 
 ## Initialize a two-node cluster
 
-Run the wizard on both data VMs first. Choose the same deployment and runtime modes and enter identical shared settings. The first VM remains prepared rather than serving until the peer is ready; cluster creation requires explicit coordination. Use the correct node-specific name/address on each VM. The secondary should be prepared before bootstrapping the primary. The wizard offers bootstrap or join after installation; choose **no** until the peer is ready, then use the local commands below. For Swarm, the secondary's join needs the worker token from the primary manager, and the manager must then enable the worker task.
+Run the wizard on both data VMs first. Use the same OS release and package versions for both data VMs and the arbitrator; mixing distro releases can produce incompatible MariaDB, Galera, or Gluster versions. Choose the same deployment and runtime modes and enter identical shared settings. The first VM remains prepared rather than serving until the peer is ready; cluster creation requires explicit coordination. Use the correct node-specific name/address on each VM. The secondary should be prepared before bootstrapping the primary. The wizard offers bootstrap or join after installation; choose **no** until the peer is ready, then use the local commands below. For Swarm, the secondary's join needs the worker token from the primary manager, and the manager must then enable the worker task.
 
 On the preferred node only:
 

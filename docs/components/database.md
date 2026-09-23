@@ -16,7 +16,7 @@ In `cluster-manual`, the preferred node has quorum weight 2 and the other weight
 
 In `cluster-arbitrator`, both data nodes have equal weight and `garbd` supplies a third vote. A remaining data node plus the arbitrator retains quorum automatically.
 
-On Ubuntu 24.04 the arbitrator uses the `galera-arbitrator-4` package and `/etc/default/garb`. Installation prepares it stopped; `cluster.municipio.sh start-arbitrator` starts it only after the data cluster exists.
+On supported Ubuntu and Debian releases, the arbitrator uses the `galera-arbitrator-4` package and `/etc/default/garb`. Installation prepares it stopped; `cluster.municipio.sh start-arbitrator` starts it only after the data cluster exists. Keep all cluster hosts on the same OS release and package versions; do not mix different MariaDB, Galera, or Gluster versions without a tested migration plan.
 
 After bootstrap or join, `/etc/municipio/cluster-initialized` marks the VM as a live cluster member. A later installer run refuses to replace changed Galera configuration on that node; such changes require an explicit rolling maintenance procedure.
 

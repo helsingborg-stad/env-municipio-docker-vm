@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "${MUNICIPIO_REPO_ROOT}/scripts/lib/common.sh"
+source "${MUNICIPIO_REPO_ROOT}/scripts/lib/platform.sh"
 load_config
-
-source /etc/os-release
-[[ "${ID:-}" == ubuntu && "${VERSION_ID:-}" == 24.04 ]] || \
-    die 'This version supports Ubuntu Server 24.04 LTS only'
-[[ "$(dpkg --print-architecture)" == amd64 ]] || \
-    die 'The selected Municipio image requires amd64'
+detect_platform
 
 if [[ "${INSTALL_PACKAGES:-true}" == true ]]; then
     export DEBIAN_FRONTEND=noninteractive
@@ -23,14 +19,14 @@ if [[ "${INSTALL_PACKAGES:-true}" == true ]]; then
             done
             ((${#conflicts[@]} == 0)) || die "Remove conflicting Docker packages first: ${conflicts[*]}"
             install -m 0755 -d /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+            curl -fsSL "https://download.docker.com/linux/${PLATFORM_ID}/gpg" -o /etc/apt/keyrings/docker.asc
             chmod a+r /etc/apt/keyrings/docker.asc
             cat > /etc/apt/sources.list.d/docker.sources <<EOF
 Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: noble
+URIs: https://download.docker.com/linux/${PLATFORM_ID}
+Suites: ${PLATFORM_CODENAME}
 Components: stable
-Architectures: amd64
+Architectures: ${PLATFORM_ARCH}
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
             data_packages+=(docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin)

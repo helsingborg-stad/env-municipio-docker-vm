@@ -2,7 +2,7 @@
 
 ## Goal
 
-Turn a fresh Ubuntu Server 24.04 LTS amd64 VM into a predictable Municipio node while keeping the host layer small and inspectable.
+Turn a fresh supported Ubuntu or Debian amd64 VM into a predictable Municipio node while keeping the host layer small and inspectable.
 
 ## Solution
 
@@ -10,8 +10,10 @@ The downloaded `installer.sh` fetches the source bundle and runs `bin/interactiv
 
 The host component installs required packages, creates `/etc/municipio`, `/opt/municipio`, and the backup directory, and copies the effective configuration to `/etc/municipio/municipio.env` with mode `0600`.
 
-The installer configures the official Docker Engine and Caddy apt repositories when their commands are absent. It installs Docker CE with the Compose plugin, Caddy, MariaDB 10.11 from Ubuntu Noble, and cluster packages when requested. It refuses to remove conflicting Docker packages automatically. Set `INSTALL_PACKAGES=false` when a VM template or configuration-management system supplies all dependencies.
+The installer supports Ubuntu 22.04 (Jammy), 24.04 (Noble), and 26.04 (Resolute) LTS, plus Debian 12 (Bookworm) and 13 (Trixie), on amd64. It reads `/etc/os-release` and chooses the matching official Docker Engine repository instead of a hardcoded Ubuntu suite. Caddy uses its Debian/Ubuntu apt repository. The distribution provides MariaDB and cluster packages, so their versions vary by OS release. The installer refuses to remove conflicting Docker packages automatically. Set `INSTALL_PACKAGES=false` when a VM template or configuration-management system supplies all dependencies.
 
-References: [Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/) and [Caddy packages for Ubuntu](https://caddyserver.com/docs/install#debian-ubuntu-raspbian).
+This is an installer compatibility matrix, not a claim that every mode has passed VM-level acceptance tests on every release. Validate package availability and a full install on disposable VMs before production rollout.
+
+References: [Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/), [Docker Engine on Debian](https://docs.docker.com/engine/install/debian/), and [Caddy packages for Debian/Ubuntu](https://caddyserver.com/docs/install#debian-ubuntu-raspbian).
 
 Installation requires root because it writes system configuration and manages systemd services. Day-to-day read operations can be delegated separately, but update, backup, failover, and maintenance commands are root operations in the first version.

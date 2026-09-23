@@ -1,6 +1,6 @@
 # Quick start
 
-On a fresh Ubuntu Server 24.04 LTS amd64 VM, run:
+On a fresh Ubuntu Server 22.04/24.04/26.04 LTS or Debian 12/13 amd64 VM, run:
 
 ```bash
 curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh -o installer.sh

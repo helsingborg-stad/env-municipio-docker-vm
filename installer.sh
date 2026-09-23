@@ -2,7 +2,7 @@
 set -eu
 
 # Publish this file at the chosen installer URL. It fetches the matching source
-# bundle before running the interactive Bash installer on the Ubuntu VM.
+# bundle before running the interactive Bash installer on the VM.
 if [ "$(id -u)" -ne 0 ]; then
     echo 'Run as root: sudo sh installer.sh' >&2
     exit 1

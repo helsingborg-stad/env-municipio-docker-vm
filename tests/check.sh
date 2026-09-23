@@ -31,6 +31,26 @@ fi
 MUNICIPIO_ENV_FILE="$ROOT_DIR/.env.example" bash -c \
     'source scripts/lib/common.sh; load_config; [[ "$DEPLOYMENT_MODE" == standalone ]]'
 
+source scripts/lib/platform.sh
+for release in 'ubuntu 22.04 jammy' 'ubuntu 24.04 noble' 'ubuntu 26.04 resolute' \
+    'debian 12 bookworm' 'debian 13 trixie'; do
+    read -r distro version codename <<< "$release"
+    platform_supported "$distro" "$version" "$codename" amd64
+done
+if platform_supported ubuntu 20.04 focal amd64 || \
+    platform_supported ubuntu 24.04 noble arm64 || \
+    platform_supported debian 13 bookworm amd64; then
+    echo 'ERROR: unsupported platform passed validation' >&2
+    exit 1
+fi
+(
+    platform_fixture="$(mktemp)"
+    trap 'rm -f "$platform_fixture"' EXIT
+    printf 'ID=debian\nVERSION_ID=13\nVERSION_CODENAME=trixie\n' > "$platform_fixture"
+    detect_platform "$platform_fixture" amd64
+    [[ "$PLATFORM_ID" == debian && "$PLATFORM_CODENAME" == trixie && "$PLATFORM_ARCH" == amd64 ]]
+)
+
 bad_env="$(mktemp)"
 trap 'rm -f "$bad_env"' EXIT
 sed 's|^MUNICIPIO_IMAGE=.*$|MUNICIPIO_IMAGE=ghcr.io/municipio-se/municipio-deployment-docker:latest|' \

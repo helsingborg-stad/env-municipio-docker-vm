@@ -39,7 +39,7 @@ if [[ -f "$caddy_dir/Caddyfile" ]] && cmp -s "$staging/Caddyfile" "$caddy_dir/Ca
     start_proxy
 else
     install -m 0644 "$staging/Caddyfile" "$caddy_dir/Caddyfile"
-    if [[ -n "$(compose ps -q caddy 2>/dev/null || true)" ]]; then
+    if container_running caddy; then
         compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
     else
         start_proxy

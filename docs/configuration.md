@@ -49,6 +49,15 @@ All three services are pinned by digest and `validate_config` rejects mutable ta
 
 `DB_ROOT_PASSWORD` is new. It initializes the database container's `root@localhost` account and is used by maintenance commands. The image is also given `MARIADB_ROOT_HOST=localhost`, so no `root@'%'` account is created.
 
+Editing `DB_ROOT_PASSWORD` in this file after installation does **not** change the password. The image applies it only when it initializes an empty data directory; afterwards the credential lives in the database itself, and every later maintenance command would fail with "Access denied". To rotate it, change the account first and then update the file:
+
+```bash
+sudo docker exec -it municipio-db mariadb -uroot -p \
+  -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'new-password'; FLUSH PRIVILEGES;"
+```
+
+In a cluster the change replicates, so update the file on **both** data VMs.
+
 In cluster modes the wizard requires both `DB_PASSWORD` and `DB_ROOT_PASSWORD` to be entered rather than generated, because a Galera state transfer replicates the privilege tables and both data VMs must agree. `cluster.municipio.sh join` verifies root access after the transfer and fails loudly on a mismatch.
 
 ## Modes

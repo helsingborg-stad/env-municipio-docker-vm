@@ -107,14 +107,17 @@ validate_config() {
     fi
 }
 
+# -p is explicit: Compose would otherwise derive the project name from the file's
+# directory, and the maintenance scripts run from whatever directory the operator
+# happens to be in. A different name would resolve no containers on a healthy node.
 compose() {
-    docker compose --env-file "$MUNICIPIO_ENV_FILE" \
+    docker compose -p municipio --env-file "$MUNICIPIO_ENV_FILE" \
         -f "${INSTALL_ROOT:-/opt/municipio}/compose.yaml" "$@"
 }
 
 # Same project, plus the overlay that makes MariaDB form a new Galera primary component.
 compose_galera_bootstrap() {
-    docker compose --env-file "$MUNICIPIO_ENV_FILE" \
+    docker compose -p municipio --env-file "$MUNICIPIO_ENV_FILE" \
         -f "${INSTALL_ROOT:-/opt/municipio}/compose.yaml" \
         -f "${INSTALL_ROOT:-/opt/municipio}/compose.galera-bootstrap.yaml" "$@"
 }
@@ -134,7 +137,18 @@ db_container() {
     local id
     id="$(compose ps -q db 2>/dev/null || true)"
     [[ -n "$id" ]] || return 1
+    # Compose versions differ on whether `ps -q` lists stopped containers. Without this,
+    # a stopped container would reach `docker exec` and fail with its own error instead
+    # of the distinct message callers rely on.
+    [[ "$(docker inspect -f '{{.State.Running}}' "$id" 2>/dev/null)" == true ]] || return 1
     printf '%s' "$id"
+}
+
+container_running() {
+    local id
+    id="$(compose ps -q "$1" 2>/dev/null || true)"
+    [[ -n "$id" ]] || return 1
+    [[ "$(docker inspect -f '{{.State.Running}}' "$id" 2>/dev/null)" == true ]]
 }
 
 db_exec() {

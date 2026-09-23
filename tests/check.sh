@@ -51,8 +51,10 @@ fi
 if docker compose version >/dev/null 2>&1; then
     quoting_env="$(mktemp)"
     quoting_yaml="$(mktemp -d)/compose.yaml"
-    tricky='pa$$w0rd \back #hash;semi&pipe| "dq" a b'
-    printf "TRICKY='%s'\n" "$tricky" > "$quoting_env"
+    # The literal $ and backslash are the point of this fixture, not an expansion.
+    # shellcheck disable=SC2016
+    probe_value='pa$$w0rd \back #hash;semi&pipe| "dq" a b'
+    printf "TRICKY='%s'\n" "$probe_value" > "$quoting_env"
     cat > "$quoting_yaml" <<'YML'
 services:
   probe:
@@ -65,16 +67,39 @@ YML
         source "$quoting_env"; set +a; printf '%s' "$TRICKY")"
     from_compose="$(docker compose --env-file "$quoting_env" -f "$quoting_yaml" run --rm -q probe)"
     rm -f "$quoting_env"
-    if [[ "$from_bash" != "$tricky" || "$from_compose" != "$tricky" ]]; then
+    if [[ "$from_bash" != "$probe_value" || "$from_compose" != "$probe_value" ]]; then
         echo 'ERROR: bash and Docker Compose disagree on the dotenv encoding' >&2
         printf '  expected: [%s]\n  bash:     [%s]\n  compose:  [%s]\n' \
-            "$tricky" "$from_bash" "$from_compose" >&2
+            "$probe_value" "$from_bash" "$from_compose" >&2
         exit 1
     fi
     grep -q "printf \"%s='%s'" bin/interactive-install.sh || {
         echo 'ERROR: the installer no longer single-quotes generated values' >&2
         exit 1
     }
+fi
+
+# The wizard's output must stand on its own. Docker Compose reads the installed file
+# directly and applies none of validate_config's shell defaults, so a path the wizard
+# forgets to write becomes an empty bind-mount source in a real installation while every
+# test that starts from .env.example still passes.
+if docker compose version >/dev/null 2>&1; then
+    wizard_env="$(mktemp)"
+    while IFS= read -r name; do
+        printf "%s='%s'\n" "$name" "$(sed -n "s/^$name=//p" .env.example)"
+    done < <({
+        sed -n 's/^write_value \([A-Z_][A-Z0-9_]*\).*/\1/p' bin/interactive-install.sh
+        sed -n "s/^COPIED_DEFAULT_NAMES='\(.*\)'$/\1/p" bin/interactive-install.sh | tr ' ' '\n'
+    } | grep -E '^[A-Z_][A-Z0-9_]*$' | sort -u) > "$wizard_env"
+    if ! docker compose --env-file "$wizard_env" -f compose.yaml config >/dev/null 2>&1; then
+        echo 'ERROR: the wizard does not write every value compose.yaml interpolates' >&2
+        docker compose --env-file "$wizard_env" -f compose.yaml config 2>&1 \
+            | grep -i 'not set\|invalid' | sort -u >&2
+        rm -f "$wizard_env"
+        exit 1
+    fi
+    MUNICIPIO_ENV_FILE="$wizard_env" bash -c 'source scripts/lib/common.sh; load_config' >/dev/null
+    rm -f "$wizard_env"
 fi
 
 # No component may reintroduce a host-installed database or web server.

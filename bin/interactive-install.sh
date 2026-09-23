@@ -179,10 +179,14 @@ choice 'Install now?' yes 'yes no'
 config_file="$(mktemp)"
 chmod 0600 "$config_file"
 trap 'rm -f -- "$config_file"' EXIT
-# The reviewed digests ship with the source bundle.
-image="$(sed -n 's/^MUNICIPIO_IMAGE=//p' "$ROOT_DIR/.env.example")"
-mariadb_image="$(sed -n 's/^MARIADB_IMAGE=//p' "$ROOT_DIR/.env.example")"
-caddy_image="$(sed -n 's/^CADDY_IMAGE=//p' "$ROOT_DIR/.env.example")"
+# The reviewed digests and path defaults ship with the source bundle.
+default_value() { sed -n "s/^$1=//p" "$ROOT_DIR/.env.example"; }
+# Settings the wizard does not ask about but must still write out verbatim. Kept on one
+# assignment so that tests/check.sh can read the list without parsing shell control flow.
+COPIED_DEFAULT_NAMES='CONFIG_ROOT INSTALL_ROOT DATA_ROOT DB_DATA_ROOT DB_SOCKET_DIR DB_SOCKET_UID DB_SOCKET_GID GLUSTER_BRICK BACKUP_ROOT HEALTH_ROOT DB_HOST DB_TABLE_PREFIX APP_BIND_ADDRESS APP_BIND_PORT WP_SITE_TITLE WP_DEBUG WP_REDIS_DISABLED'
+image="$(default_value MUNICIPIO_IMAGE)"
+mariadb_image="$(default_value MARIADB_IMAGE)"
+caddy_image="$(default_value CADDY_IMAGE)"
 write_value DEPLOYMENT_MODE "$deployment_mode"
 write_value DOCKER_SWARM "$docker_swarm"
 write_value NODE_ROLE "$node_role"
@@ -206,6 +210,15 @@ write_value DB_ROOT_PASSWORD "$db_root_password"
 write_value WP_ADMIN_USER "$wp_admin_user"
 write_value WP_ADMIN_PASSWORD "$wp_admin_password"
 write_value WP_ADMIN_EMAIL "$wp_admin_email"
+
+# The generated file has to be self-contained. Docker Compose reads it directly and
+# applies none of the defaults that validate_config fills in for the shell, so an
+# unwritten DB_DATA_ROOT or DATA_ROOT becomes an empty bind-mount source. It is also the
+# copy captured into every backup, and DB_DATA_ROOT is what decides where the database
+# lives. tests/check.sh reads this list to rebuild a wizard-shaped file and validate it.
+for name in $COPIED_DEFAULT_NAMES; do
+    write_value "$name" "$(default_value "$name")"
+done
 
 MUNICIPIO_ENV_FILE="$config_file" bash -c 'source "$1/scripts/lib/common.sh"; load_config' _ "$ROOT_DIR"
 bash "$ROOT_DIR/bin/install.sh" --env-file "$config_file"

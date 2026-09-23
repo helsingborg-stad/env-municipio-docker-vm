@@ -35,7 +35,18 @@ There is no in-place conversion from the previous host-installed layout. Migrate
    sudo /scripts/backup.municipio.sh pre-containerization
    ```
 2. Install the containerized version on a fresh VM, or reinstall the node after removing the old `mariadb-server` and `caddy` packages.
-3. Restore `database.sql.gz` into the new database container and unpack `files.tar.gz` into `DATA_ROOT`.
+3. Restore the archive. There is no `mariadb` client on the host any more, so the dump
+   goes in through the database container:
+   ```bash
+   sudo /scripts/maintenance.municipio.sh on
+   # shellcheck disable=SC2154
+   DB_ROOT_PASSWORD="$(sudo sed -n "s/^DB_ROOT_PASSWORD='\(.*\)'$/\1/p" /etc/municipio/municipio.env)"
+   zcat database.sql.gz | sudo docker exec -i -e MYSQL_PWD="$DB_ROOT_PASSWORD" \
+     municipio-db mariadb -uroot municipio
+   sudo tar -C /srv/municipio/data -xzf files.tar.gz
+   sudo /scripts/maintenance.municipio.sh off
+   ```
+   Use the database name from `DB_NAME` if it is not the default.
 
 Do not point `DB_DATA_ROOT` at the old `/var/lib/mysql`. The image version is pinned by digest and may differ from the distribution package the directory was written by.
 

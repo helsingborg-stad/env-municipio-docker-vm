@@ -6,12 +6,7 @@ Keep uploads and requested cache directories available locally on every data VM 
 
 ## Standalone solution
 
-The installer creates these directories on the VM's existing filesystem:
-
-```text
-/srv/municipio/data/uploads
-/srv/municipio/data/cache
-```
+The installer creates `/srv/municipio/data/uploads` and `/srv/municipio/data/cache` on the VM's existing filesystem.
 
 Docker bind-mounts them into the container. “Mount” here does not mean an external storage service.
 
@@ -26,4 +21,3 @@ The initial version intentionally uses a replicated filesystem instead of bidire
 ## Cache behavior
 
 Cache directories are replicated because it is an explicit platform requirement. During rolling application updates, nodes with different image versions must not write incompatible cache entries concurrently. The update workflow drains nodes and clears the shared cache only after every node runs the same version. This behavior needs load testing with the selected Municipio release.
-

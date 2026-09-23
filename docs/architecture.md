@@ -6,26 +6,38 @@ Run the same Municipio image used in larger environments without introducing an 
 
 ## Standalone
 
-```text
-Internet -> Caddy -> local Docker container -> local MariaDB
-                         |
-                         +-> /srv/municipio/data on the VM disk
+```mermaid
+flowchart LR
+    internet["Internet"] --> caddy["Caddy"]
+    caddy --> app["Municipio container"]
+    app --> db["Local MariaDB"]
+    app --> files["/srv/municipio/data on VM disk"]
 ```
 
 There is no cluster software in the data path. Failure recovery uses backups or VM-level recovery.
 
 ## Two data nodes
 
-```text
-                  HTTP round-robin
-                    /           \
-                  VM 1          VM 2
-                 Caddy         Caddy
-               Municipio     Municipio
-             local MariaDB  local MariaDB
-                   | Galera sync |
-             local files <-> local files
-                    GlusterFS
+```mermaid
+flowchart TB
+    lb["HTTP round-robin with /healthz checks"]
+
+    subgraph vm1["Data VM 1"]
+        c1["Caddy"] --> a1["Municipio container"]
+        a1 --> d1["Local MariaDB"]
+        a1 --> f1["Local uploads and cache"]
+    end
+
+    subgraph vm2["Data VM 2"]
+        c2["Caddy"] --> a2["Municipio container"]
+        a2 --> d2["Local MariaDB"]
+        a2 --> f2["Local uploads and cache"]
+    end
+
+    lb --> c1
+    lb --> c2
+    d1 <-->|Galera replication| d2
+    f1 <-->|GlusterFS replication| f2
 ```
 
 The HTTP round-robin layer is outside this repository. It must health-check `/healthz`. It never handles database traffic.

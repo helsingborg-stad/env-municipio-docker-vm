@@ -7,9 +7,9 @@ curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker
 sudo sh installer.sh
 ```
 
-The wizard runs on the VM and asks a few questions. For a single server, press Enter to keep **standalone** and **Compose**. Enter the VM address, public site hostname, WordPress administrator email, and passwords (or let the wizard generate passwords). Confirm the summary to install.
+The wizard runs on the VM and asks a few questions. For a single server, press Enter to keep **standalone** and **Compose**. Enter the VM address, public site hostname, WordPress administrator email, and passwords (or let the wizard generate passwords). A standalone install asks for three secrets: the application database password, the **database root password**, and the WordPress administrator password. Confirm the summary to install.
 
-When it finishes, the application, local MariaDB, Caddy, and health timer are started and enabled for reboot. Open the site hostname in a browser. Check the server with:
+When it finishes, the application, MariaDB and Caddy containers and the health timer are started and enabled for reboot. Nothing but Docker was installed as a package. Open the site hostname in a browser. Check the server with:
 
 ```bash
 sudo /scripts/status.municipio.sh
@@ -17,8 +17,8 @@ sudo /scripts/status.municipio.sh
 
 If setup stops after saving the configuration, run `sudo sh installer.sh` again and choose **yes** to resume. A missing Docker socket usually means the Engine service did not start; check `sudo systemctl status docker.service` and `sudo journalctl -u docker.service` if the retry cannot start it.
 
-The generated settings are at `/etc/municipio/municipio.env`, readable only by root. If you let the wizard generate passwords, retrieve and store them securely from that file; the installer does not print them. To update the container image later, use `/scripts/update.municipio.sh` with an exact image digest.
+The generated settings are at `/etc/municipio/municipio.env`, readable only by root. If you let the wizard generate passwords, retrieve and store them securely from that file; the installer does not print them. Values are written single-quoted, because the file is read both by bash and by Docker Compose's dotenv parser — keep that form if you edit it. To update the application image later, use `/scripts/update.municipio.sh` with an exact image digest; the MariaDB and Caddy images have their own deliberate procedure in the [runbook](runbook.md).
 
 The download URL will work once the repository's `main` branch is publicly published. If you prefer a branded URL such as `https://install.getmunicipio.com`, serve the repository's `installer.sh` over HTTPS at that address. The bootstrap script downloads the source bundle from the GitHub `main` branch by default; for releases, publish a versioned archive and update its source URL before advertising the installer. Do not advertise a domain until it actually serves the reviewed script.
 
-For a two-VM cluster, select `cluster-manual` or `cluster-arbitrator` and answer the additional peer questions on each VM. The first install prepares services but cannot start a cluster alone. Once peers are ready, the wizard can bootstrap or join a node; Swarm workers also need a join token and a manager-side `enable-node` command. Follow the [cluster runbook](runbook.md) for the safe order. Swarm is an optional runtime choice in the same wizard.
+For a two-VM cluster, select `cluster-manual` or `cluster-arbitrator` and answer the additional peer questions on each VM. Both data VMs must be given identical database passwords, because a Galera state transfer replicates the privilege tables. The first install prepares services but cannot start a cluster alone. Once peers are ready, the wizard can bootstrap or join a node; Swarm workers also need a join token and a manager-side `enable-node` command. Follow the [cluster runbook](runbook.md) for the safe order, including `cluster.municipio.sh clear-bootstrap-flag` once the peer has joined. Swarm is an optional runtime choice in the same wizard.

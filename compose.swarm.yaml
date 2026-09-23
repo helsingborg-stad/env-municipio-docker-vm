@@ -1,3 +1,5 @@
+# Swarm manages the application only. MariaDB and Caddy stay per-VM Compose services
+# from compose.yaml, because both own node-local state that must never be rescheduled.
 services:
   municipio:
     image: ${MUNICIPIO_IMAGE:?MUNICIPIO_IMAGE is required}
@@ -22,7 +24,7 @@ services:
         mode: host
     volumes:
       - type: bind
-        source: /run/mysqld
+        source: ${DB_SOCKET_DIR}
         target: /run/mysqld
         read_only: true
       - type: bind

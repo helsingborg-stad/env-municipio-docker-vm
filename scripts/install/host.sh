@@ -8,10 +8,11 @@ detect_platform
 if [[ "${INSTALL_PACKAGES:-true}" == true ]]; then
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
-    apt-get install -y ca-certificates curl gnupg debian-keyring debian-archive-keyring apt-transport-https
+    apt-get install -y ca-certificates curl gnupg
 
     if [[ "$NODE_ROLE" == data ]]; then
-        data_packages=()
+        # Docker Engine is the only service runtime a data VM needs. MariaDB and Caddy
+        # are container images, so no database or web server package is installed here.
         if ! command -v docker >/dev/null 2>&1 || ! systemctl cat docker.service >/dev/null 2>&1; then
             conflicts=()
             for package in docker.io docker-compose docker-compose-v2 docker-doc docker-buildx podman-docker containerd runc; do
@@ -29,25 +30,18 @@ Components: stable
 Architectures: ${PLATFORM_ARCH}
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
-            data_packages+=(docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin)
-        fi
-
-        if ! command -v caddy >/dev/null 2>&1; then
-            curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | \
-                gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-            curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt \
-                -o /etc/apt/sources.list.d/caddy-stable.list
-            chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg /etc/apt/sources.list.d/caddy-stable.list
-            data_packages+=(caddy)
-        fi
-        if ((${#data_packages[@]})); then
             apt-get update
-            apt-get install -y "${data_packages[@]}"
+            apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
         fi
     fi
-    packages=(rsync mariadb-client gzip tar util-linux)
+
+    packages=(gzip tar util-linux)
     if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
-        packages+=(glusterfs-server glusterfs-client)
+        # GlusterFS is a kernel/FUSE storage layer rather than an application service,
+        # so it stays on the host. See docs/components/storage.md.
+        packages+=(glusterfs-server glusterfs-client rsync)
+        # The arbitrator is a quorum-only witness host that stores no data and runs no
+        # container; garbd is not part of the MariaDB image.
         [[ "$NODE_ROLE" == arbiter ]] && packages+=(galera-arbitrator-4)
     fi
     apt-get install -y "${packages[@]}"
@@ -67,13 +61,18 @@ if [[ "$NODE_ROLE" == data ]]; then
     done
     [[ "$docker_ready" == true ]] || die 'Docker daemon is unavailable; inspect systemctl status docker.service and journalctl -u docker.service'
     docker compose version >/dev/null 2>&1 || die 'Docker Compose plugin is required'
-    command -v caddy >/dev/null 2>&1 || die 'caddy is required'
 fi
 
-install -d -m 0750 /etc/municipio "${INSTALL_ROOT:-/opt/municipio}" "${BACKUP_ROOT:-/var/backups/municipio}"
-if [[ "$(readlink -f "$MUNICIPIO_ENV_FILE")" != /etc/municipio/municipio.env ]]; then
-    install -m 0600 "$MUNICIPIO_ENV_FILE" /etc/municipio/municipio.env
+install -d -m 0750 "$CONFIG_ROOT" "${INSTALL_ROOT:-/opt/municipio}" "${BACKUP_ROOT:-/var/backups/municipio}"
+if [[ "$NODE_ROLE" == data ]]; then
+    # The Compose project has to exist before install/database.sh can start MariaDB.
+    for file in compose.yaml compose.swarm.yaml compose.galera-bootstrap.yaml; do
+        install -m 0644 "$MUNICIPIO_REPO_ROOT/$file" "$INSTALL_ROOT/$file"
+    done
+fi
+if [[ "$(readlink -f "$MUNICIPIO_ENV_FILE")" != "$CONFIG_ROOT/municipio.env" ]]; then
+    install -m 0600 "$MUNICIPIO_ENV_FILE" "$CONFIG_ROOT/municipio.env"
 else
-    chmod 0600 /etc/municipio/municipio.env
+    chmod 0600 "$CONFIG_ROOT/municipio.env"
 fi
 log "Host prerequisites installed"

@@ -5,6 +5,7 @@ load_config
 
 echo "node=$NODE_NAME role=$NODE_ROLE mode=$DEPLOYMENT_MODE"
 if [[ "$NODE_ROLE" == data ]]; then
+    compose ps db caddy
     if [[ "$DOCKER_SWARM" == 1 ]]; then
         if swarm_is_manager; then
             docker stack services municipio 2>/dev/null || echo 'swarm_stack=not-deployed'
@@ -13,12 +14,15 @@ if [[ "$NODE_ROLE" == data ]]; then
             docker ps --filter label=com.docker.swarm.service.name="$(swarm_service_name)"
         fi
     else
-        compose ps
+        compose ps municipio
     fi
-    systemctl --no-pager --quiet is-active caddy && echo 'caddy=active' || echo 'caddy=inactive'
-    systemctl --no-pager --quiet is-active mariadb && echo 'mariadb=active' || echo 'mariadb=inactive'
-    if [[ "$DEPLOYMENT_MODE" != standalone ]] && systemctl --quiet is-active mariadb; then
-        mariadb --table -e "SHOW STATUS WHERE Variable_name IN ('wsrep_ready','wsrep_connected','wsrep_cluster_status','wsrep_cluster_size','wsrep_local_state_comment')"
+    [[ -S "${DB_SOCKET_DIR}/mysqld.sock" ]] && echo 'db_socket=present' || echo 'db_socket=missing'
+    if [[ -f "$(galera_bootstrap_marker)" ]]; then
+        echo 'galera_bootstrap=ACTIVE - this node re-forms a new cluster on restart.'
+        echo '  Run: /scripts/cluster.municipio.sh clear-bootstrap-flag'
+    fi
+    if [[ "$DEPLOYMENT_MODE" != standalone ]] && db_container >/dev/null 2>&1; then
+        db_root mariadb -uroot --table -e "SHOW STATUS WHERE Variable_name IN ('wsrep_ready','wsrep_connected','wsrep_cluster_status','wsrep_cluster_size','wsrep_local_state_comment')"
         gluster volume status municipio || true
         gluster volume heal municipio info summary || true
     fi

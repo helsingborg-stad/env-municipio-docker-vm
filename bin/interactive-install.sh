@@ -42,6 +42,10 @@ secret() {
         printf '%s%s: ' "$label" "$([[ "$optional" == true ]] && printf ' (Enter to generate)' || true)" >&2
         IFS= read -r -s -u 3 answer || exit 1
         printf '\n' >&2
+        if contains_single_quote "$answer"; then
+            echo "A single quote (') cannot be stored in the configuration file." >&2
+            continue
+        fi
         if [[ -n "$answer" || "$optional" == true ]]; then
             REPLY="$answer"
             return
@@ -51,7 +55,22 @@ secret() {
 }
 
 random_secret() { openssl rand -hex 24; }
-write_value() { printf '%s=%q\n' "$1" "$2" >> "$config_file"; }
+
+# The generated file is read twice with different parsers: bash `source` in the
+# maintenance scripts, and Docker Compose's dotenv reader for container environments.
+# Single quoting is the only encoding the two agree on for every shell metacharacter.
+# `printf %q` is not: it escapes with backslashes that bash decodes and Compose does not,
+# so a password containing $, \ or a space would reach the database and the container as
+# two different strings.
+contains_single_quote() { case "$1" in *\'*) return 0 ;; *) return 1 ;; esac; }
+
+write_value() {
+    if contains_single_quote "$2"; then
+        echo "Value for $1 must not contain a single quote." >&2
+        exit 1
+    fi
+    printf "%s='%s'\n" "$1" "$2" >> "$config_file"
+}
 
 if [[ -e /etc/municipio/municipio.env ]]; then
     echo 'Existing Municipio configuration found at /etc/municipio/municipio.env.'
@@ -122,7 +141,7 @@ if [[ "$deployment_mode" != standalone ]]; then
     fi
 fi
 
-site_address= caddy_address= db_name= db_user= db_password=
+site_address= caddy_address= db_name= db_user= db_password= db_root_password=
 wp_admin_user= wp_admin_password= wp_admin_email=
 if [[ "$node_role" == data ]]; then
     ask 'Public website hostname (without https://)' ; site_address="$REPLY"
@@ -130,12 +149,22 @@ if [[ "$node_role" == data ]]; then
     tls_mode="$REPLY"
     caddy_address="$site_address"
     [[ "$tls_mode" == upstream ]] && caddy_address=:80
+    # In a cluster the state transfer replicates the privilege tables, so both data VMs
+    # must be given the same database passwords. Generated values cannot match, which is
+    # why they are only offered for standalone.
+    secrets_optional=true
+    if [[ "$deployment_mode" != standalone ]]; then
+        secrets_optional=false
+        echo 'Both data VMs must be installed with identical database passwords.' >&2
+    fi
     ask 'Database name' municipio; db_name="$REPLY"
     ask 'Database user' municipio; db_user="$REPLY"
-    secret 'Database password' "$([[ "$deployment_mode" == standalone ]] && echo true || echo false)"
+    secret 'Database password' "$secrets_optional"
     db_password="${REPLY:-$(random_secret)}"
+    secret 'Database root password' "$secrets_optional"
+    db_root_password="${REPLY:-$(random_secret)}"
     ask 'WordPress admin user' admin; wp_admin_user="$REPLY"
-    secret 'WordPress admin password' "$([[ "$deployment_mode" == standalone ]] && echo true || echo false)"
+    secret 'WordPress admin password' "$secrets_optional"
     wp_admin_password="${REPLY:-$(random_secret)}"
     ask 'WordPress admin email'; wp_admin_email="$REPLY"
 fi
@@ -150,7 +179,10 @@ choice 'Install now?' yes 'yes no'
 config_file="$(mktemp)"
 chmod 0600 "$config_file"
 trap 'rm -f -- "$config_file"' EXIT
+# The reviewed digests ship with the source bundle.
 image="$(sed -n 's/^MUNICIPIO_IMAGE=//p' "$ROOT_DIR/.env.example")"
+mariadb_image="$(sed -n 's/^MARIADB_IMAGE=//p' "$ROOT_DIR/.env.example")"
+caddy_image="$(sed -n 's/^CADDY_IMAGE=//p' "$ROOT_DIR/.env.example")"
 write_value DEPLOYMENT_MODE "$deployment_mode"
 write_value DOCKER_SWARM "$docker_swarm"
 write_value NODE_ROLE "$node_role"
@@ -163,11 +195,14 @@ write_value SECONDARY_NODE_ADDRESS "$secondary_address"
 write_value ARBITRATOR_NODE_NAME "$arbiter_name"
 write_value ARBITRATOR_NODE_ADDRESS "$arbiter_address"
 write_value MUNICIPIO_IMAGE "$image"
+write_value MARIADB_IMAGE "$mariadb_image"
+write_value CADDY_IMAGE "$caddy_image"
 write_value SITE_ADDRESS "$site_address"
 write_value CADDY_SITE_ADDRESS "$caddy_address"
 write_value DB_NAME "$db_name"
 write_value DB_USER "$db_user"
 write_value DB_PASSWORD "$db_password"
+write_value DB_ROOT_PASSWORD "$db_root_password"
 write_value WP_ADMIN_USER "$wp_admin_user"
 write_value WP_ADMIN_PASSWORD "$wp_admin_password"
 write_value WP_ADMIN_EMAIL "$wp_admin_email"

@@ -31,9 +31,17 @@ case "$action" in
         fi
         gluster volume start municipio || true
         mount_volume
-        galera_new_cluster
-        touch /etc/municipio/cluster-initialized
-        /scripts/failover.municipio.sh provision-database
+        docker pull -q "$MARIADB_IMAGE" >/dev/null
+        # Unlike the one-shot galera_new_cluster helper this replaces, a container keeps
+        # its command across restarts. The marker records that, and status reports it
+        # until clear-bootstrap-flag removes both.
+        touch "$(galera_bootstrap_marker)"
+        compose_galera_bootstrap up -d --no-deps --force-recreate db
+        wait_for_database 600 || die 'MariaDB did not form a Galera primary component'
+        verify_socket_ownership
+        [[ "$(db_status_value wsrep_cluster_status)" == Primary ]] || die 'Galera did not reach the Primary component'
+        touch "$CONFIG_ROOT/cluster-initialized"
+        provision_database
         if [[ "$DOCKER_SWARM" == 1 ]]; then
             swarm_state="$(docker info --format '{{.Swarm.LocalNodeState}}')"
             if [[ "$swarm_state" == inactive ]]; then
@@ -42,22 +50,33 @@ case "$action" in
             swarm_is_manager || die 'Bootstrap node must be the Swarm manager'
             docker node update --label-add municipio.data=true "$(docker node inspect self --format '{{.ID}}')"
         else
-            compose pull
+            compose pull municipio
         fi
         deploy_application
         wait_for_application
         /scripts/maintenance.municipio.sh off
+        log 'Bootstrapped. Once the secondary has joined, run: clear-bootstrap-flag'
         ;;
     join)
         [[ "$NODE_ROLE" == data ]] || die 'Join must run on a data node'
         mount_volume
-        systemctl enable --now mariadb
-        [[ "$(mariadb --batch --skip-column-names -e "SHOW STATUS LIKE 'wsrep_ready'" | awk '{print $2}')" == ON ]] || die 'Local Galera is not ready'
-        [[ "$(mariadb --batch --skip-column-names -e "SHOW STATUS LIKE 'wsrep_cluster_status'" | awk '{print $2}')" == Primary ]] || die 'Local Galera is not in the Primary component'
+        docker pull -q "$MARIADB_IMAGE" >/dev/null
+        start_database
+        # A joiner receives a full state transfer from the donor before it can answer,
+        # so this waits far longer than a standalone start.
+        wait_for_database 3600 || die 'MariaDB did not complete its Galera state transfer'
+        verify_socket_ownership
+        [[ "$(db_status_value wsrep_ready)" == ON ]] || die 'Local Galera is not ready'
+        [[ "$(db_status_value wsrep_cluster_status)" == Primary ]] || die 'Local Galera is not in the Primary component'
+        # The state transfer overwrites the privilege tables with the donor's copy, so
+        # the local root password only works if both nodes were configured with the same
+        # DB_ROOT_PASSWORD. Detect that here instead of at the next maintenance command.
+        db_root mariadb -uroot -e 'SELECT 1' >/dev/null 2>&1 || \
+            die 'DB_ROOT_PASSWORD does not match the one the donor replicated. Both data VMs must be installed with the same database root password.'
         mountpoint -q "$DATA_ROOT" || die 'Local Gluster mount is missing'
         findmnt -no OPTIONS --target "$DATA_ROOT" | tr ',' '\n' | grep -qx rw || die 'Local Gluster mount is read-only'
         [[ -w "$DATA_ROOT/uploads" && -w "$DATA_ROOT/cache" ]] || die 'Local shared data is not writable'
-        touch /etc/municipio/cluster-initialized
+        touch "$CONFIG_ROOT/cluster-initialized"
         if [[ "$DOCKER_SWARM" == 1 ]]; then
             [[ "$(docker info --format '{{.Swarm.LocalNodeState}}')" == inactive ]] || die 'This VM already belongs to a Swarm'
             [[ "${2:-}" == --token-stdin ]] || die 'Provide the worker join token on standard input with join --token-stdin'
@@ -68,11 +87,28 @@ case "$action" in
             docker swarm join --token "$join_token" --advertise-addr "$NODE_ADDRESS" "$PRIMARY_NODE_ADDRESS:2377"
             log 'Worker joined. Run enable-node on the manager after verifying local state.'
         else
-            compose pull
+            compose pull municipio
             deploy_application
             wait_for_application
             /scripts/maintenance.municipio.sh off
         fi
+        log 'Joined. On the primary VM, run: clear-bootstrap-flag'
+        ;;
+    clear-bootstrap-flag)
+        [[ -f "$(galera_bootstrap_marker)" ]] || { log 'No Galera bootstrap flag is set'; exit 0; }
+        size="$(db_status_value wsrep_cluster_size)"
+        [[ "$size" =~ ^[0-9]+$ && "$size" -ge 2 ]] || \
+            die "Refusing to clear the bootstrap flag with wsrep_cluster_size=${size}. The peer must have joined first."
+        log "Recreating MariaDB without --wsrep-new-cluster (current cluster size: ${size})."
+        log 'This node will rejoin through gcomm://. If the peer leaves during the'
+        log 'restart, this node comes up non-Primary and stays down until the peer returns.'
+        compose up -d --no-deps --force-recreate db
+        wait_for_database 600 || die 'MariaDB did not return after clearing the bootstrap flag'
+        if [[ "$(db_status_value wsrep_cluster_status)" != Primary ]]; then
+            die 'MariaDB restarted but is not in the Primary component. Restore the peer, then re-run this command; do not bootstrap a second time.'
+        fi
+        rm -f "$(galera_bootstrap_marker)"
+        log 'Bootstrap flag cleared; this node now joins normally on restart.'
         ;;
     enable-node)
         [[ "$DOCKER_SWARM" == 1 ]] || die 'enable-node is available in Swarm mode only'
@@ -101,5 +137,5 @@ case "$action" in
         systemctl enable --now garb
         systemctl enable --now glusterd
         ;;
-    *) echo "Usage: $0 bootstrap | join [--token-stdin] | enable-node HOSTNAME | status | restore-quorum | clear-cache --all-nodes-drained | start-arbitrator" >&2; exit 2 ;;
+    *) echo "Usage: $0 bootstrap | join [--token-stdin] | clear-bootstrap-flag | enable-node HOSTNAME | status | restore-quorum | clear-cache --all-nodes-drained | start-arbitrator" >&2; exit 2 ;;
 esac

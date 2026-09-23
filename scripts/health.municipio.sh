@@ -13,11 +13,17 @@ else
     docker inspect -f '{{.State.Running}}' municipio-app 2>/dev/null | grep -qx true
 fi
 curl -fsS -o /dev/null "http://${APP_BIND_ADDRESS:-127.0.0.1}:${APP_BIND_PORT:-8080}/"
-mariadb-admin --protocol=socket ping --silent
+db_exec mariadb-admin --protocol=socket ping --silent
+# The application reaches MariaDB only through this socket, so its presence on the host
+# is part of the health contract, not an implementation detail.
+[[ -S "${DB_SOCKET_DIR}/mysqld.sock" ]]
 
 if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
-    [[ "$(mariadb --batch --skip-column-names -e "SHOW STATUS LIKE 'wsrep_ready'" | awk '{print $2}')" == ON ]]
-    [[ "$(mariadb --batch --skip-column-names -e "SHOW STATUS LIKE 'wsrep_cluster_status'" | awk '{print $2}')" == Primary ]]
+    [[ "$(db_status_value wsrep_ready)" == ON ]]
+    [[ "$(db_status_value wsrep_cluster_status)" == Primary ]]
+    # Evaluated on the host on purpose: inside a container findmnt would report the
+    # container's own bind mount and would still say "rw" after the host's Gluster mount
+    # had gone read-only, keeping a broken node in the load balancer's rotation.
     mountpoint -q "$DATA_ROOT"
     findmnt -no OPTIONS --target "$DATA_ROOT" | tr ',' '\n' | grep -qx rw
 fi

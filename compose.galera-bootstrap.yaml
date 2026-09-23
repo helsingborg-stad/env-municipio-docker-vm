@@ -1,0 +1,12 @@
+# Overlay used only by `cluster.municipio.sh bootstrap` and `failover.municipio.sh
+# promote`. It makes the local MariaDB container form a new Galera primary component
+# instead of joining an existing one.
+#
+# A container started with this overlay keeps the flag across restarts, unlike the
+# one-shot `galera_new_cluster` helper it replaces. Rebooting such a node would create a
+# second primary component. `cluster.municipio.sh clear-bootstrap-flag` removes it once
+# the peer has joined; until then /etc/municipio/galera-bootstrap-active records the risk
+# and status.municipio.sh reports it.
+services:
+  db:
+    command: ["--wsrep-new-cluster"]

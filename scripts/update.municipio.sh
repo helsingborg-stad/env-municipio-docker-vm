@@ -25,7 +25,9 @@ else
 fi
 tmp_env="$(mktemp)"
 trap 'rm -f "$tmp_env"' EXIT
-sed "s|^MUNICIPIO_IMAGE=.*$|MUNICIPIO_IMAGE=${new_image}|" "$MUNICIPIO_ENV_FILE" > "$tmp_env"
+# Single-quoted to match the encoding the installer writes: the file is parsed both by
+# bash and by Docker Compose, which disagree on backslash escapes.
+sed "s|^MUNICIPIO_IMAGE=.*\$|MUNICIPIO_IMAGE='${new_image}'|" "$MUNICIPIO_ENV_FILE" > "$tmp_env"
 install -m 0600 "$tmp_env" "$MUNICIPIO_ENV_FILE"
 export MUNICIPIO_IMAGE="$new_image"
 
@@ -40,7 +42,7 @@ fi
 
 if [[ "$update_ok" == false ]]; then
     if [[ -n "$old_image" ]]; then
-        sed "s|^MUNICIPIO_IMAGE=.*$|MUNICIPIO_IMAGE=${old_image}|" "$MUNICIPIO_ENV_FILE" > "$tmp_env"
+        sed "s|^MUNICIPIO_IMAGE=.*\$|MUNICIPIO_IMAGE='${old_image}'|" "$MUNICIPIO_ENV_FILE" > "$tmp_env"
         install -m 0600 "$tmp_env" "$MUNICIPIO_ENV_FILE"
         export MUNICIPIO_IMAGE="$old_image"
         if [[ "$DOCKER_SWARM" == 1 ]]; then

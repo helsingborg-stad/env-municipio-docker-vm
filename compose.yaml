@@ -1,4 +1,50 @@
 services:
+  # MariaDB shares the host network namespace so that bind-address, the published port
+  # matrix and Galera replication behave exactly as they did with the distribution
+  # package. The application never reaches it over the network: DB_SOCKET_DIR is the
+  # only connection path, mounted read-only into the application container.
+  db:
+    image: ${MARIADB_IMAGE:?MARIADB_IMAGE is required}
+    container_name: municipio-db
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+      # Without this the image also creates root@'%'.
+      MARIADB_ROOT_HOST: localhost
+    volumes:
+      - "${DB_DATA_ROOT}:/var/lib/mysql"
+      - "${DB_SOCKET_DIR}:/run/mysqld"
+      - "${CONFIG_ROOT:-/etc/municipio}/mariadb:/etc/mysql/conf.d:ro"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+  # Caddy also uses the host network namespace: it owns ports 80/443 on the VM, keeps
+  # real client addresses, and reaches the local application task at the same loopback
+  # address in both Compose and Swarm mode.
+  caddy:
+    image: ${CADDY_IMAGE:?CADDY_IMAGE is required}
+    container_name: municipio-caddy
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      # The directory is mounted, not the file: an in-place config replacement swaps the
+      # inode and would detach a single-file bind mount.
+      - "${CONFIG_ROOT:-/etc/municipio}/caddy:/etc/caddy:ro"
+      - "${HEALTH_ROOT}:/var/lib/municipio/health:ro"
+      - "caddy_data:/data"
+      - "caddy_config:/config"
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   municipio:
     image: ${MUNICIPIO_IMAGE:?MUNICIPIO_IMAGE is required}
     container_name: municipio-app
@@ -20,7 +66,7 @@ services:
     ports:
       - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_BIND_PORT:-8080}:80"
     volumes:
-      - "/run/mysqld:/run/mysqld:ro"
+      - "${DB_SOCKET_DIR}:/run/mysqld:ro"
       - "${DATA_ROOT}/uploads:/var/www/vhosts/localhost/html/wp-content/uploads"
       - "${DATA_ROOT}/cache:/var/www/vhosts/localhost/html/wp-content/cache"
     healthcheck:
@@ -29,3 +75,7 @@ services:
       timeout: 5s
       retries: 4
       start_period: 60s
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Configure installation and runtime from one dotenv file, while allowing CI to generate the same file from protected variables.
+Keep installation and runtime settings in one root-owned dotenv file. The interactive installer collects values and generates this file; operators can review it before any later reconfiguration.
 
 The installed file is `/etc/municipio/municipio.env`, owned by root with mode `0600`. It is sourced by root-run maintenance scripts, so its content must be trusted and shell-compatible.
 
@@ -23,7 +23,7 @@ DB_USER=municipio
 DB_PASSWORD=...
 ```
 
-Set `DOCKER_SWARM=1` to use a per-VM single-node Swarm instead of Compose. It defaults to `0`.
+Set `DOCKER_SWARM=1` to use Swarm instead of Compose. It defaults to `0`. In a two-VM deployment, the preferred VM is the Swarm manager and the secondary VM joins as a worker.
 
 Image tags are intentionally rejected by `update.municipio.sh`; production updates require a digest.
 

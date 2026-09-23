@@ -10,7 +10,9 @@ mariadb-dump --single-transaction --routines --events "$DB_NAME" | gzip -c > "$t
 tar -C "$DATA_ROOT" -czf "$target/files.tar.gz" uploads cache
 install -m 0600 "$MUNICIPIO_ENV_FILE" "$target/municipio.env"
 if [[ "$DOCKER_SWARM" == 1 ]]; then
-    docker service inspect -f '{{.Spec.TaskTemplate.ContainerSpec.Image}}' "$(swarm_service_name)" > "$target/image.txt"
+    local_container="$(docker ps -q --filter label=com.docker.swarm.service.name="$(swarm_service_name)" --filter status=running | head -n 1)"
+    [[ -n "$local_container" ]] || die 'No local Municipio task to record'
+    docker inspect -f '{{.Config.Image}}' "$local_container" > "$target/image.txt"
 else
     docker inspect -f '{{.Config.Image}}' municipio-app > "$target/image.txt"
 fi

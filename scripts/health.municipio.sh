@@ -8,7 +8,7 @@ marker="${HEALTH_ROOT}/healthz"
 rm -f "$marker"
 [[ ! -e /run/municipio/maintenance ]] || exit 1
 if [[ "$DOCKER_SWARM" == 1 ]]; then
-    docker service ps --filter desired-state=running --format '{{.CurrentState}}' "$(swarm_service_name)" 2>/dev/null | grep -q '^Running'
+    [[ -n "$(docker ps -q --filter label=com.docker.swarm.service.name="$(swarm_service_name)" --filter status=running)" ]]
 else
     docker inspect -f '{{.State.Running}}' municipio-app 2>/dev/null | grep -qx true
 fi

@@ -6,7 +6,7 @@ Turn a fresh Ubuntu Server 24.04 LTS amd64 VM into a predictable Municipio node 
 
 ## Solution
 
-`bin/install.sh` validates the dotenv configuration and runs six independent component installers in order: host, storage, database, application, proxy, and maintenance.
+The downloaded `installer.sh` fetches the source bundle and runs `bin/interactive-install.sh`. The wizard writes a temporary root-only dotenv file, validates it, then calls `bin/install.sh`. That lower-level installer runs six independent component installers in order: host, storage, database, maintenance, application, and proxy. Standalone services are started before the wizard exits. Cluster services are prepared, then the wizard offers activation only when peers are ready.
 
 The host component installs required packages, creates `/etc/municipio`, `/opt/municipio`, and the backup directory, and copies the effective configuration to `/etc/municipio/municipio.env` with mode `0600`.
 

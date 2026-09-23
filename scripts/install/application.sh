@@ -11,13 +11,16 @@ install -m 0644 "$MUNICIPIO_REPO_ROOT/compose.swarm.yaml" "$INSTALL_ROOT/compose
 install -m 0644 "$MUNICIPIO_REPO_ROOT/runtime/config/content.php" "$INSTALL_ROOT/runtime/config/content.php"
 if [[ "$DOCKER_SWARM" == 1 ]]; then
     swarm_state="$(docker info --format '{{.Swarm.LocalNodeState}}')"
-    if [[ "$swarm_state" == inactive ]]; then
+    if [[ "$DEPLOYMENT_MODE" == standalone && "$swarm_state" == inactive ]]; then
         docker swarm init --advertise-addr "$NODE_ADDRESS"
+        swarm_state=active
     fi
-    [[ "$(docker info --format '{{.Swarm.ControlAvailable}}')" == true ]] || \
-        die 'DOCKER_SWARM=1 requires this VM to be its own Swarm manager'
-    [[ "$(docker node ls -q | wc -l | tr -d ' ')" == 1 ]] || \
-        die 'This mode supports one independent single-node Swarm per VM only'
+    if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
+        swarm_is_manager || die 'Standalone Swarm requires this VM to be a manager'
+        docker node update --label-add municipio.data=true "$(docker node inspect self --format '{{.ID}}')"
+    elif [[ "$swarm_state" != inactive && "$swarm_state" != active ]]; then
+        die "Unexpected Swarm state: $swarm_state"
+    fi
 fi
 
 if [[ "$DEPLOYMENT_MODE" == standalone ]]; then

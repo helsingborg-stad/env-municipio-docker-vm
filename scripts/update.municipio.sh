@@ -11,7 +11,11 @@ new_image="${1:-$MUNICIPIO_IMAGE}"
 
 exec 9>/run/lock/municipio-update.lock
 flock -n 9 || die 'Another update is running'
-/scripts/maintenance.municipio.sh on
+if [[ "$DOCKER_SWARM" == 1 ]]; then
+    swarm_is_manager || die 'Run the Swarm update on the manager'
+else
+    /scripts/maintenance.municipio.sh on
+fi
 /scripts/backup.municipio.sh pre-update
 
 if [[ "$DOCKER_SWARM" == 1 ]]; then
@@ -53,5 +57,7 @@ if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
 else
     log 'Shared cache was not cleared; clear it once after every node runs the same digest'
 fi
-/scripts/maintenance.municipio.sh off
+if [[ "$DOCKER_SWARM" == 0 ]]; then
+    /scripts/maintenance.municipio.sh off
+fi
 echo "updated=${new_image}"

@@ -80,9 +80,13 @@ compose() {
 
 swarm_service_name() { printf 'municipio_municipio'; }
 
+swarm_is_manager() {
+    [[ "$(docker info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null)" == true ]]
+}
+
 deploy_application() {
     if [[ "$DOCKER_SWARM" == 1 ]]; then
-        export SWARM_NODE_HOSTNAME="${SWARM_NODE_HOSTNAME:-$(docker node inspect self --format '{{.Description.Hostname}}')}"
+        swarm_is_manager || die 'Deploy from the Swarm manager'
         docker stack deploy --with-registry-auth \
             -c "${INSTALL_ROOT:-/opt/municipio}/compose.swarm.yaml" municipio
     else
@@ -91,12 +95,17 @@ deploy_application() {
 }
 
 wait_for_application() {
-    local deadline=$((SECONDS + 180)) service
+    local deadline=$((SECONDS + 180)) service expected running
     if [[ "$DOCKER_SWARM" == 1 ]]; then
+        swarm_is_manager || die 'Check the service from the Swarm manager'
         service="$(swarm_service_name)"
-        until [[ "$(docker service inspect -f '{{.Spec.TaskTemplate.ContainerSpec.Image}}' "$service" 2>/dev/null || true)" == "$MUNICIPIO_IMAGE" ]] \
-            && docker service ps --filter desired-state=running --format '{{.CurrentState}}' "$service" 2>/dev/null | grep -q '^Running' \
-            && curl -fsS -o /dev/null "http://127.0.0.1:${APP_BIND_PORT:-8080}/"; do
+        until {
+            expected="$(docker node ls --filter node.label=municipio.data=true --format '{{.ID}}' 2>/dev/null | wc -l | tr -d ' ')"
+            running="$(docker service ps --filter desired-state=running --format '{{.CurrentState}}' "$service" 2>/dev/null | grep -c '^Running' || true)"
+            [[ "$expected" -gt 0 && "$running" -eq "$expected" ]] \
+                && [[ "$(docker service inspect -f '{{.Spec.TaskTemplate.ContainerSpec.Image}}' "$service" 2>/dev/null || true)" == "$MUNICIPIO_IMAGE" ]] \
+                && curl -fsS -o /dev/null "http://127.0.0.1:${APP_BIND_PORT:-8080}/"
+        }; do
             if ((SECONDS >= deadline)); then
                 log "Timed out waiting for Swarm service $service"
                 return 1

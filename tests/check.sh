@@ -7,9 +7,11 @@ cd "$ROOT_DIR"
 while IFS= read -r file; do
     bash -n "$file"
 done < <(find bin scripts tests -type f -name '*.sh' -print)
+sh -n installer.sh
 
 if command -v shellcheck >/dev/null 2>&1; then
     find bin scripts tests -type f -name '*.sh' -print0 | xargs -0 shellcheck
+    shellcheck -s sh installer.sh
 else
     echo 'SKIP: shellcheck is not installed'
 fi
@@ -26,7 +28,8 @@ if docker compose version >/dev/null 2>&1; then
     # shellcheck disable=SC1091
     source .env.example
     set +a
-    SWARM_NODE_HOSTNAME=municipio-test docker stack config -c compose.swarm.yaml >/dev/null
+    docker stack config -c compose.swarm.yaml | grep -q 'mode: global'
+    docker stack config -c compose.swarm.yaml | grep -q 'node.labels.municipio.data == true'
 else
     echo 'SKIP: docker compose is not installed'
 fi

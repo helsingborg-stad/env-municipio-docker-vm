@@ -34,7 +34,16 @@ case "$action" in
         galera_new_cluster
         touch /etc/municipio/cluster-initialized
         /scripts/failover.municipio.sh provision-database
-        [[ "$DOCKER_SWARM" == 1 ]] || compose pull
+        if [[ "$DOCKER_SWARM" == 1 ]]; then
+            swarm_state="$(docker info --format '{{.Swarm.LocalNodeState}}')"
+            if [[ "$swarm_state" == inactive ]]; then
+                docker swarm init --advertise-addr "$NODE_ADDRESS"
+            fi
+            swarm_is_manager || die 'Bootstrap node must be the Swarm manager'
+            docker node update --label-add municipio.data=true "$(docker node inspect self --format '{{.ID}}')"
+        else
+            compose pull
+        fi
         deploy_application
         wait_for_application
         /scripts/maintenance.municipio.sh off
@@ -43,11 +52,39 @@ case "$action" in
         [[ "$NODE_ROLE" == data ]] || die 'Join must run on a data node'
         mount_volume
         systemctl enable --now mariadb
+        [[ "$(mariadb --batch --skip-column-names -e "SHOW STATUS LIKE 'wsrep_ready'" | awk '{print $2}')" == ON ]] || die 'Local Galera is not ready'
+        [[ "$(mariadb --batch --skip-column-names -e "SHOW STATUS LIKE 'wsrep_cluster_status'" | awk '{print $2}')" == Primary ]] || die 'Local Galera is not in the Primary component'
+        mountpoint -q "$DATA_ROOT" || die 'Local Gluster mount is missing'
+        findmnt -no OPTIONS --target "$DATA_ROOT" | tr ',' '\n' | grep -qx rw || die 'Local Gluster mount is read-only'
+        [[ -w "$DATA_ROOT/uploads" && -w "$DATA_ROOT/cache" ]] || die 'Local shared data is not writable'
         touch /etc/municipio/cluster-initialized
-        [[ "$DOCKER_SWARM" == 1 ]] || compose pull
+        if [[ "$DOCKER_SWARM" == 1 ]]; then
+            [[ "$(docker info --format '{{.Swarm.LocalNodeState}}')" == inactive ]] || die 'This VM already belongs to a Swarm'
+            [[ "${2:-}" == --token-stdin ]] || die 'Provide the worker join token on standard input with join --token-stdin'
+            [[ ! -t 0 ]] || printf 'Swarm worker join token: ' >&2
+            read -r -s join_token
+            [[ ! -t 0 ]] || printf '\n' >&2
+            [[ -n "$join_token" ]] || die 'Missing Swarm worker join token'
+            docker swarm join --token "$join_token" --advertise-addr "$NODE_ADDRESS" "$PRIMARY_NODE_ADDRESS:2377"
+            log 'Worker joined. Run enable-node on the manager after verifying local state.'
+        else
+            compose pull
+            deploy_application
+            wait_for_application
+            /scripts/maintenance.municipio.sh off
+        fi
+        ;;
+    enable-node)
+        [[ "$DOCKER_SWARM" == 1 ]] || die 'enable-node is available in Swarm mode only'
+        swarm_is_manager || die 'Run enable-node on the Swarm manager'
+        node_id="${2:-}"
+        [[ -n "$node_id" && "$node_id" =~ ^[A-Za-z0-9._-]+$ ]] || die 'Provide a valid worker hostname'
+        [[ "$(docker node inspect "$node_id" --format '{{.Status.State}}')" == ready ]] || die 'Worker is not ready'
+        [[ "$(docker node inspect "$node_id" --format '{{.Spec.Role}}')" == worker ]] || die 'Target must be a worker'
+        [[ "$(docker node inspect "$node_id" --format '{{.Status.Addr}}')" == "$SECONDARY_NODE_ADDRESS" ]] || die 'Worker address does not match SECONDARY_NODE_ADDRESS'
+        docker node update --label-add municipio.data=true "$node_id"
         deploy_application
         wait_for_application
-        /scripts/maintenance.municipio.sh off
         ;;
     status) /scripts/status.municipio.sh ;;
     restore-quorum)
@@ -64,5 +101,5 @@ case "$action" in
         systemctl enable --now garb
         systemctl enable --now glusterd
         ;;
-    *) echo "Usage: $0 bootstrap | join | status | restore-quorum | clear-cache --all-nodes-drained | start-arbitrator" >&2; exit 2 ;;
+    *) echo "Usage: $0 bootstrap | join [--token-stdin] | enable-node HOSTNAME | status | restore-quorum | clear-cache --all-nodes-drained | start-arbitrator" >&2; exit 2 ;;
 esac

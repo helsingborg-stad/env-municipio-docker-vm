@@ -6,8 +6,12 @@ load_config
 echo "node=$NODE_NAME role=$NODE_ROLE mode=$DEPLOYMENT_MODE"
 if [[ "$NODE_ROLE" == data ]]; then
     if [[ "$DOCKER_SWARM" == 1 ]]; then
-        docker stack services municipio 2>/dev/null || echo 'swarm_stack=not-deployed'
-        docker stack ps --no-trunc municipio 2>/dev/null || true
+        if swarm_is_manager; then
+            docker stack services municipio 2>/dev/null || echo 'swarm_stack=not-deployed'
+            docker stack ps --no-trunc municipio 2>/dev/null || true
+        else
+            docker ps --filter label=com.docker.swarm.service.name="$(swarm_service_name)"
+        fi
     else
         compose ps
     fi

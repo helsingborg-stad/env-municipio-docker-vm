@@ -18,6 +18,8 @@ sudo /scripts/failover.municipio.sh promote --fence-confirmed
 
 This is deliberately not automatic. Before returning the former node, start it as a joiner and verify Galera state transfer and Gluster healing. Then restore normal filesystem quorum with `cluster.municipio.sh restore-quorum` and re-enable HTTP health.
 
+With `DOCKER_SWARM=1`, the preferred node is also the sole Swarm manager. The secondary's existing application task can resume serving after manual storage/database promotion, but Swarm updates and scheduling remain unavailable until the manager is recovered or explicitly replaced.
+
 ## Cluster with arbitrator
 
 Loss of either data VM leaves one data vote plus the independent arbitrator vote. Galera and Gluster retain safe quorum, and the HTTP round-robin layer removes only the failed node.

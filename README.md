@@ -24,23 +24,22 @@ The design deliberately has no database load balancer, shared database endpoint,
 - A health timer publishes `/healthz` only while the complete local node is usable.
 - Maintenance commands are installed in `/scripts`.
 - A documented runtime override fixes forwarded HTTPS and `WP_CONTENT_URL` behavior in image `6.2.5`.
-- `DOCKER_SWARM=1` switches application execution from Compose to an independent single-node Swarm on each VM.
+- `DOCKER_SWARM=1` runs one coordinated Swarm service across the data VMs, with one local application task per VM.
 
 See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md), [Docker Swarm mode](docs/components/swarm.md), [Host preparation](docs/components/host.md), [Network boundaries](docs/components/network.md), and the [Runbook](docs/runbook.md).
 
 ## Quick start: standalone
 
-On a fresh Ubuntu Server 24.04 LTS amd64 VM:
+On a fresh Ubuntu Server 24.04 LTS amd64 VM, download the installer and run it locally:
 
 ```bash
-git clone <this-repository> /tmp/municipio-installer
-cd /tmp/municipio-installer
-cp .env.example .env
-sudo editor .env
-sudo ./bin/install.sh --env-file "$PWD/.env"
+curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh -o installer.sh
+sudo sh installer.sh
 ```
 
-The installer copies the effective configuration to `/etc/municipio/municipio.env` and installs operational commands under `/scripts`.
+The wizard asks for your hostname, website hostname, TLS choice, database credentials, and WordPress administrator. Press Enter to accept the standalone and Docker Compose defaults. When it finishes, Caddy, MariaDB, and Municipio are running as managed services. The effective configuration is stored at `/etc/municipio/municipio.env`; operational commands are installed under `/scripts`.
+
+The URL above becomes usable when this repository's `main` branch is published. A friendly download domain can serve the same `installer.sh` file; see [Quick start](docs/quick-start.md) for publishing and verification notes.
 
 ```bash
 sudo /scripts/status.municipio.sh
@@ -48,14 +47,7 @@ sudo /scripts/update.municipio.sh ghcr.io/municipio-se/municipio-deployment-dock
 sudo /scripts/backup.municipio.sh manual
 ```
 
-## Run remotely
-
-```bash
-rsync -a --delete ./ deploy@example:/tmp/municipio-installer/
-ssh deploy@example 'sudo /tmp/municipio-installer/bin/install.sh --env-file /tmp/municipio-installer/.env'
-```
-
-CI uses the same command. Generate a shell-compatible dotenv file from protected CI variables, copy the repository and file to the target, then invoke `install.sh` over SSH. Never pass database passwords as command-line arguments.
+For the short walkthrough, see [Quick start](docs/quick-start.md). Two-VM and Swarm setups require peer coordination; see the [Runbook](docs/runbook.md).
 
 ## Current maturity
 

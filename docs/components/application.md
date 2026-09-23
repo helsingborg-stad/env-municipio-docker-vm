@@ -14,5 +14,4 @@ The container reaches the VM's native MariaDB through a read-only bind mount of 
 
 Image `6.2.5` hardcodes `WP_CONTENT_URL` with `http://`. This repository bind-mounts `runtime/config/content.php` over that configuration file. The override derives the content URL from `WP_HOME` and marks requests as HTTPS when they arrive from the loopback-only Caddy proxy with `X-Forwarded-Proto: https`.
 
-`update.municipio.sh` drains the local node, takes a backup, pulls the new digest, recreates only the application container, verifies health, and returns the node to service. It does not run `docker compose down`.
-
+In Compose mode, `update.municipio.sh` drains the local node, takes a backup, replaces only its application container, verifies health, and returns the node to service. It does not run `docker compose down`. In Swarm mode, run the command once on the manager: it updates the shared global service one task at a time across the data VMs.

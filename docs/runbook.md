@@ -11,38 +11,21 @@
 
 The exact port matrix is documented in [Network boundaries](components/network.md). MariaDB port 3306 stays local; only Galera and Gluster replication ports cross between VMs.
 
-## Local execution on the server
+## Interactive installation on the server
 
 ```bash
-cp .env.example .env
-sudo editor .env
-sudo ./bin/install.sh --env-file "$PWD/.env"
+curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh -o installer.sh
+sudo sh installer.sh
 sudo /scripts/status.municipio.sh
 ```
 
-To use Docker Swarm execution, set `DOCKER_SWARM=1` before installation. The installer initializes an independent single-node Swarm on that VM. All operational commands remain the same.
+Choose `swarm` in the wizard to set `DOCKER_SWARM=1`. Standalone initializes a one-node Swarm. In a cluster, bootstrap initializes the preferred VM as manager and the secondary joins as a worker. See [Swarm mode](components/swarm.md) for the join sequence.
 
-The installer is intended to be rerunnable. Review configuration diffs before rerunning it on an established cluster.
-
-## Execute through SSH
-
-```bash
-rsync -a --delete ./ deploy@server:/tmp/municipio-installer/
-scp production.env deploy@server:/tmp/municipio.env
-ssh deploy@server 'sudo /tmp/municipio-installer/bin/install.sh --env-file /tmp/municipio.env'
-```
-
-## Execute from CI
-
-1. Render `municipio.env` from protected CI variables without printing it.
-2. Copy the repository and env file to the target VM.
-3. Run the same `install.sh` command over SSH.
-4. Run `/scripts/status.municipio.sh` and request `/healthz`.
-5. Delete the temporary env file; the installed copy remains under `/etc/municipio`.
+The wizard refuses to overwrite an existing installed configuration. The lower-level `bin/install.sh --env-file` remains available for carefully reviewed reconfiguration from a local checkout; it is not the normal installation path.
 
 ## Initialize a two-node cluster
 
-Run the installer on both data VMs first. Use the same shared settings and correct node-specific `NODE_NAME`/`NODE_ADDRESS`.
+Run the wizard on both data VMs first. Choose the same deployment and runtime modes and enter identical shared settings. The first VM remains prepared rather than serving until the peer is ready; cluster creation requires explicit coordination. Use the correct node-specific name/address on each VM. The secondary should be prepared before bootstrapping the primary. The wizard offers bootstrap or join after installation; choose **no** until the peer is ready, then use the local commands below. For Swarm, the secondary's join needs the worker token from the primary manager, and the manager must then enable the worker task.
 
 On the preferred node only:
 
@@ -50,10 +33,21 @@ On the preferred node only:
 sudo /scripts/cluster.municipio.sh bootstrap
 ```
 
-On the secondary:
+On the secondary with Compose:
 
 ```bash
 sudo /scripts/cluster.municipio.sh join
+```
+
+With Swarm, display the token on the primary manager, enter it on the secondary, then enable its task on the manager:
+
+```bash
+# On the primary VM:
+sudo docker swarm join-token -q worker
+# On the secondary VM (paste the token when prompted):
+sudo /scripts/cluster.municipio.sh join --token-stdin
+# Back on the primary VM:
+sudo /scripts/cluster.municipio.sh enable-node SECONDARY_HOSTNAME
 ```
 
 Then validate from both:
@@ -78,7 +72,7 @@ sudo /scripts/update.municipio.sh \
   ghcr.io/municipio-se/municipio-deployment-docker@sha256:<new-digest>
 ```
 
-In a cluster, update one node at a time and confirm `/healthz` before moving to the next. After every node runs the same digest, drain both nodes briefly and run `cluster.municipio.sh clear-cache --all-nodes-drained` once before returning them to service. Cache behavior still needs validation before zero-downtime production rollout.
+With Compose, update one node at a time. With Swarm, run the update **once on the manager**; the global service rolls tasks across both data VMs. After every node runs the same digest, drain both nodes briefly and run `cluster.municipio.sh clear-cache --all-nodes-drained` once before returning them to service. Cache behavior still needs validation before zero-downtime production rollout.
 
 ## Back up
 

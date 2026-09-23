@@ -42,11 +42,10 @@ services:
       retries: 4
       start_period: 60s
     deploy:
-      mode: replicated
-      replicas: 1
+      mode: global
       placement:
         constraints:
-          - node.hostname == ${SWARM_NODE_HOSTNAME}
+          - node.labels.municipio.data == true
       restart_policy:
         condition: any
         delay: 5s

@@ -4,11 +4,13 @@
 # `sudo sh uninstaller.sh` starts it under dash; re-run it under bash before any bash syntax.
 if [ -z "${BASH_VERSION:-}" ]; then exec bash "$0" "$@"; fi
 set -uo pipefail
-# Also removes Docker Engine and its data, even if Docker was on the VM before the install.
+# Also removes Docker Engine and its data, even if Docker was on the VM before the install,
+# and the MariaDB and Caddy packages the earlier host-installed layout put on the VM.
 [[ $EUID -eq 0 ]] || { echo "Run as root: sudo $0 [--yes]" >&2; exit 1; }
 
 if [[ "${1:-}" != --yes ]]; then
     echo 'This permanently deletes Municipio, its database, uploads, backups and Docker Engine.'
+    echo 'Any MariaDB or Caddy installed directly on this server is removed too, with its data.'
     read -r -p 'Type "yes" to continue: ' answer
     [[ "$answer" == yes ]] || { echo 'Aborted'; exit 1; }
 fi
@@ -56,17 +58,32 @@ if command -v gluster >/dev/null 2>&1; then
     systemctl disable --now glusterd 2>/dev/null
 fi
 
+# The host-installed layout ran MariaDB and Caddy as distribution services. Left behind,
+# they hold ports 3306 and 80/443, which the containers need, and keep the old database.
+echo '>> Stopping host-installed MariaDB and Caddy'
+systemctl disable --now mariadb caddy 2>/dev/null
+
 echo '>> Removing files and directories'
 rm -rf /scripts /usr/local/lib/municipio "$INSTALL_ROOT" "$CONFIG_ROOT" /var/lib/municipio \
     "$DATA_ROOT" "$GLUSTER_BRICK" /srv/municipio "$BACKUP_ROOT" /etc/default/garb /var/log/garb.log
 rmdir /srv 2>/dev/null
 
-echo '>> Purging packages (Docker, GlusterFS, Galera arbitrator)'
+echo '>> Purging packages (Docker, GlusterFS, Galera, host-installed MariaDB and Caddy)'
 export DEBIAN_FRONTEND=noninteractive
-apt-get purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
-    docker-ce-rootless-extras glusterfs-server glusterfs-client galera-arbitrator-4 2>/dev/null
+# Only installed packages are named: apt-get refuses the whole purge when one name is
+# unknown, which caddy is once its repository has been removed.
+installed=()
+for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+    docker-ce-rootless-extras glusterfs-server glusterfs-client galera-arbitrator-4 \
+    mariadb-server mariadb-client mariadb-backup galera-4 caddy; do
+    dpkg-query -W -f '${Status}' "$pkg" 2>/dev/null | grep -q 'ok installed' && installed+=("$pkg")
+done
+((${#installed[@]} == 0)) || apt-get purge -y "${installed[@]}"
 rm -rf /var/lib/docker /var/lib/containerd /etc/docker /var/lib/glusterd /etc/glusterfs /var/log/glusterfs
-rm -f /etc/apt/sources.list.d/docker.sources /etc/apt/keyrings/docker.asc
+# A noninteractive purge of mariadb-server keeps the databases, so remove them explicitly.
+rm -rf /var/lib/mysql /etc/mysql /var/log/mysql /etc/caddy /var/lib/caddy
+rm -f /etc/apt/sources.list.d/docker.sources /etc/apt/keyrings/docker.asc \
+    /etc/apt/sources.list.d/caddy-stable.list /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 getent group docker >/dev/null && groupdel docker
 apt-get autoremove --purge -y
 apt-get update

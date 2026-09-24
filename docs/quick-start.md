@@ -35,7 +35,7 @@ curl -fL "https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docke
 sudo MUNICIPIO_SOURCE_URL="https://github.com/helsingborg-stad/env-municipio-docker-vm/archive/refs/heads/$BRANCH.tar.gz" sh installer.sh
 ```
 
-To remove the installation and return the VM to its original state, download and run the uninstaller the same way. It deletes the database, uploads and backups, and removes Docker Engine; see [Uninstalling](../README.md#uninstalling).
+To remove the installation and return the VM to its original state, download and run the uninstaller the same way. It deletes the database, uploads and backups, and removes Docker Engine and any MariaDB or Caddy installed directly on the VM by the earlier host-installed layout; see [Uninstalling](../README.md#uninstalling).
 
 ```bash
 curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/uninstaller.sh -o uninstaller.sh

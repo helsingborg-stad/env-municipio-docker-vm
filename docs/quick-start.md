@@ -21,7 +21,7 @@ When it finishes, the application, MariaDB and Caddy containers and the health t
 sudo /scripts/status.municipio.sh
 ```
 
-If setup stops after saving the configuration, run `sudo sh installer.sh` again and choose **yes** to resume. A missing Docker socket usually means the Engine service did not start; check `sudo systemctl status docker.service` and `sudo journalctl -u docker.service` if the retry cannot start it.
+If setup stops after saving the configuration, run `sudo sh installer.sh` again and choose **yes** to resume. The installer first checks that the saved settings are complete. Settings written by an older installer version cannot be resumed; it says so and stops without changing anything, and the server should then be reinstalled from scratch. A missing Docker socket usually means the Engine service did not start; check `sudo systemctl status docker.service` and `sudo journalctl -u docker.service` if the retry cannot start it.
 
 The generated settings are at `/etc/municipio/municipio.env`, readable only by root. Generated passwords are not printed. If the WordPress password was generated, the wizard ends by showing the `sudo grep WP_ADMIN_PASSWORD …` command that reveals it. Values are written single-quoted, because the file is read both by bash and by Docker Compose's dotenv parser — keep that form if you edit it. To update the application image later, use `/scripts/update.municipio.sh` with an exact image digest; the MariaDB and Caddy images have their own deliberate procedure in the [runbook](runbook.md).
 

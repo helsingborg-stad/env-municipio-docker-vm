@@ -152,6 +152,21 @@ detected_address() {
 }
 
 if [[ -e /etc/municipio/municipio.env ]]; then
+    # A file written by an older installer version, or cut short, cannot be resumed. Say so
+    # before offering to continue, instead of failing on the first missing setting after.
+    if ! saved_problem="$(MUNICIPIO_ENV_FILE=/etc/municipio/municipio.env \
+        bash -c 'source "$1/scripts/lib/common.sh"; load_config' _ "$ROOT_DIR" 2>&1 >/dev/null)"; then
+        say 'This server already has saved Municipio settings (/etc/municipio/municipio.env),'
+        say 'but they cannot be used to continue. They were probably written by an older'
+        say 'version of the installer, or by an installation that stopped part-way.'
+        say "Reason: ${saved_problem#\[municipio\] ERROR: }"
+        say ''
+        say 'Start again on a fresh server. Alternatively, remove the earlier installation first'
+        say 'with the uninstaller and run this installer again:'
+        say '  https://github.com/helsingborg-stad/env-municipio-docker-vm/blob/main/README.md#uninstalling'
+        say 'Nothing was changed.'
+        exit 1
+    fi
     say 'This server already has saved Municipio settings (/etc/municipio/municipio.env),'
     say 'probably from an earlier installation that did not finish.'
     yes_no 'Continue that installation with the saved settings?' no

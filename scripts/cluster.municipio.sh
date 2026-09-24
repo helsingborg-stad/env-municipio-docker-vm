@@ -21,12 +21,14 @@ case "$action" in
         gluster peer probe "$SECONDARY_NODE_ADDRESS"
         if [[ "$DEPLOYMENT_MODE" == cluster-arbitrator ]]; then
             gluster peer probe "$ARBITRATOR_NODE_ADDRESS"
-            gluster volume info municipio >/dev/null 2>&1 || gluster volume create municipio replica 2 arbiter 1 \
+            gluster volume info municipio >/dev/null 2>&1 || gluster --mode=script volume create municipio replica 2 arbiter 1 \
                 "${PRIMARY_NODE_ADDRESS}:${GLUSTER_BRICK}" \
                 "${SECONDARY_NODE_ADDRESS}:${GLUSTER_BRICK}" \
                 "${ARBITRATOR_NODE_ADDRESS}:${GLUSTER_BRICK}" force
         else
-            gluster volume info municipio >/dev/null 2>&1 || gluster volume create municipio replica 2 \
+            # --mode=script answers Gluster's replica-2 split-brain confirmation, which would
+            # otherwise stop an unattended bootstrap; quorum and fencing handle that risk.
+            gluster volume info municipio >/dev/null 2>&1 || gluster --mode=script volume create municipio replica 2 \
                 "${PRIMARY_NODE_ADDRESS}:${GLUSTER_BRICK}" \
                 "${SECONDARY_NODE_ADDRESS}:${GLUSTER_BRICK}" force
             gluster volume set municipio cluster.quorum-type auto

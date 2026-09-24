@@ -180,9 +180,11 @@ start_proxy() { compose up -d --no-deps caddy; }
 # container generates for itself: a Galera state transfer replaces the joiner's privilege
 # tables with the donor's but keeps the joiner's credential file, so that probe fails
 # forever on every node that joined. DB_ROOT_PASSWORD is identical on both data VMs.
+# skip_networking excludes the entrypoint's temporary init server, which listens on the
+# same socket with wsrep off before the real server starts.
 database_ready() {
     [[ "$(docker exec -e MYSQL_PWD="$DB_ROOT_PASSWORD" "$1" mariadb -uroot --batch --skip-column-names \
-        -e "SELECT 1 FROM information_schema.ENGINES WHERE engine='InnoDB' AND support IN ('YES','DEFAULT')" 2>/dev/null)" == 1 ]]
+        -e "SELECT 1 FROM information_schema.ENGINES WHERE engine='InnoDB' AND support IN ('YES','DEFAULT') AND @@skip_networking=0" 2>/dev/null)" == 1 ]]
 }
 
 # Standalone starts in under a minute. A cluster joiner may need a full state transfer

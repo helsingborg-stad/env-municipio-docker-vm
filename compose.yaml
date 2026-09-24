@@ -24,7 +24,7 @@ services:
         - CMD-SHELL
         - >-
           MYSQL_PWD="$$MARIADB_ROOT_PASSWORD" mariadb -uroot --batch --skip-column-names
-          -e "SELECT 1 FROM information_schema.ENGINES WHERE engine='InnoDB' AND support IN ('YES','DEFAULT')"
+          -e "SELECT 1 FROM information_schema.ENGINES WHERE engine='InnoDB' AND support IN ('YES','DEFAULT') AND @@skip_networking=0"
           | grep -qx 1
       interval: 10s
       timeout: 5s

@@ -151,6 +151,76 @@ detected_address() {
     printf '%s' "${address:-127.0.0.1}"
 }
 
+# The steps after installing a cluster server. Shared by a fresh installation and by
+# resuming one from saved settings, which would otherwise stop before the cluster starts.
+# Reads deployment_mode, docker_swarm, selected_role, node_name and node_address.
+cluster_next_steps() {
+    # bootstrap and join write this marker once the local database is in the cluster.
+    if [[ -f /etc/municipio/cluster-initialized ]]; then
+        heading 'This server is already part of the cluster'
+        if [[ -f /etc/municipio/galera-bootstrap-active ]]; then
+            say 'Once website server 2 has connected, finish by running this on this server:'
+            say '  sudo /scripts/cluster.municipio.sh clear-bootstrap-flag'
+        fi
+        say 'Check the servers with: sudo /scripts/status.municipio.sh'
+        return 0
+    fi
+    heading 'This server is installed'
+    say "When installing the other servers, enter this server as: $node_name ($node_address)"
+    say 'The cluster starts once all servers are installed, in this order:'
+    say '  1. Install every server (you can do this in any order).'
+    say '  2. Start the cluster on website server 1.'
+    say '  3. Connect website server 2.'
+    say '  4. Confirm on website server 1 that server 2 has joined (clear-bootstrap-flag).'
+    [[ "$deployment_mode" != cluster-arbitrator ]] || say '  5. Start the tie-breaker.'
+    say 'You can answer "no" below and continue later. Every step is described in the runbook:'
+    say '  https://github.com/helsingborg-stad/env-municipio-docker-vm/blob/main/docs/runbook.md'
+    case "$selected_role" in
+        primary)
+            yes_no 'Is website server 2 installed, and should the cluster start now?' no
+            if [[ "$REPLY" == yes ]]; then
+                /scripts/cluster.municipio.sh bootstrap
+                if [[ "$docker_swarm" == 1 ]]; then
+                    say 'Website server 2 will ask for a join code. Show it here with:'
+                    say '  sudo docker swarm join-token -q worker'
+                fi
+                say 'After website server 2 has connected, finish by running this on this server:'
+                say '  sudo /scripts/cluster.municipio.sh clear-bootstrap-flag'
+            else
+                say 'Later, start it with: sudo /scripts/cluster.municipio.sh bootstrap'
+            fi
+            ;;
+        secondary)
+            yes_no 'Has the cluster been started on website server 1, and should this server connect now?' no
+            if [[ "$REPLY" == yes ]]; then
+                if [[ "$docker_swarm" == 1 ]]; then
+                    say 'On website server 1, run: sudo docker swarm join-token -q worker'
+                    secret 'Paste the join code it prints' false 1 false
+                    printf '%s\n' "$REPLY" | /scripts/cluster.municipio.sh join --token-stdin
+                    say 'Then, on website server 1, run:'
+                    say "  sudo /scripts/cluster.municipio.sh enable-node $node_name"
+                    say '  sudo /scripts/cluster.municipio.sh clear-bootstrap-flag'
+                else
+                    /scripts/cluster.municipio.sh join
+                    say 'Connected. Finish by running this on website server 1:'
+                    say '  sudo /scripts/cluster.municipio.sh clear-bootstrap-flag'
+                fi
+            else
+                say 'Later, connect it with: sudo /scripts/cluster.municipio.sh join'
+            fi
+            ;;
+        arbiter)
+            yes_no 'Are both website servers connected, and should the tie-breaker start now?' no
+            if [[ "$REPLY" == yes ]]; then
+                /scripts/cluster.municipio.sh start-arbitrator
+            else
+                say 'Later, start it with: sudo /scripts/cluster.municipio.sh start-arbitrator'
+            fi
+            ;;
+    esac
+    say 'Check the servers with: sudo /scripts/status.municipio.sh'
+}
+
 if [[ -e /etc/municipio/municipio.env ]]; then
     # A file written by an older installer version, or cut short, cannot be resumed. Say so
     # before offering to continue, instead of failing on the first missing setting after.
@@ -172,7 +242,24 @@ if [[ -e /etc/municipio/municipio.env ]]; then
     yes_no 'Continue that installation with the saved settings?' no
     [[ "$REPLY" == yes ]] || { say 'Nothing was changed. To start over, run the uninstaller first.'; exit 0; }
     bash "$ROOT_DIR/bin/install.sh" --env-file /etc/municipio/municipio.env
-    /scripts/status.municipio.sh
+    { read -r deployment_mode; read -r docker_swarm; read -r saved_role; read -r node_name
+      read -r node_address; read -r primary_name; } < <(MUNICIPIO_ENV_FILE=/etc/municipio/municipio.env bash -c \
+        'source "$1/scripts/lib/common.sh"; load_config
+         printf "%s\n" "$DEPLOYMENT_MODE" "$DOCKER_SWARM" "$NODE_ROLE" "$NODE_NAME" "$NODE_ADDRESS" "${PRIMARY_NODE_NAME:-}"' \
+        _ "$ROOT_DIR")
+    if [[ "$deployment_mode" == standalone ]]; then
+        /scripts/status.municipio.sh
+        exit 0
+    fi
+    # The wizard's own answer is not saved, but the settings it wrote determine it.
+    if [[ "$saved_role" == arbiter ]]; then
+        selected_role=arbiter
+    elif [[ "$node_name" == "$primary_name" ]]; then
+        selected_role=primary
+    else
+        selected_role=secondary
+    fi
+    cluster_next_steps
     exit 0
 fi
 
@@ -413,57 +500,4 @@ if [[ "$deployment_mode" == standalone ]]; then
     exit 0
 fi
 
-heading 'This server is installed'
-say "When installing the other servers, enter this server as: $node_name ($node_address)"
-say 'The cluster starts once all servers are installed, in this order:'
-say '  1. Install every server (you can do this in any order).'
-say '  2. Start the cluster on website server 1.'
-say '  3. Connect website server 2.'
-say '  4. Confirm on website server 1 that server 2 has joined (clear-bootstrap-flag).'
-[[ "$deployment_mode" != cluster-arbitrator ]] || say '  5. Start the tie-breaker.'
-say 'You can answer "no" below and continue later. Every step is described in the runbook:'
-say '  https://github.com/helsingborg-stad/env-municipio-docker-vm/blob/main/docs/runbook.md'
-case "$selected_role" in
-    primary)
-        yes_no 'Is website server 2 installed, and should the cluster start now?' no
-        if [[ "$REPLY" == yes ]]; then
-            /scripts/cluster.municipio.sh bootstrap
-            if [[ "$docker_swarm" == 1 ]]; then
-                say 'Website server 2 will ask for a join code. Show it here with:'
-                say '  sudo docker swarm join-token -q worker'
-            fi
-            say 'After website server 2 has connected, finish by running this on this server:'
-            say '  sudo /scripts/cluster.municipio.sh clear-bootstrap-flag'
-        else
-            say 'Later, start it with: sudo /scripts/cluster.municipio.sh bootstrap'
-        fi
-        ;;
-    secondary)
-        yes_no 'Has the cluster been started on website server 1, and should this server connect now?' no
-        if [[ "$REPLY" == yes ]]; then
-            if [[ "$docker_swarm" == 1 ]]; then
-                say 'On website server 1, run: sudo docker swarm join-token -q worker'
-                secret 'Paste the join code it prints' false 1 false
-                printf '%s\n' "$REPLY" | /scripts/cluster.municipio.sh join --token-stdin
-                say 'Then, on website server 1, run:'
-                say "  sudo /scripts/cluster.municipio.sh enable-node $node_name"
-                say '  sudo /scripts/cluster.municipio.sh clear-bootstrap-flag'
-            else
-                /scripts/cluster.municipio.sh join
-                say 'Connected. Finish by running this on website server 1:'
-                say '  sudo /scripts/cluster.municipio.sh clear-bootstrap-flag'
-            fi
-        else
-            say 'Later, connect it with: sudo /scripts/cluster.municipio.sh join'
-        fi
-        ;;
-    arbiter)
-        yes_no 'Are both website servers connected, and should the tie-breaker start now?' no
-        if [[ "$REPLY" == yes ]]; then
-            /scripts/cluster.municipio.sh start-arbitrator
-        else
-            say 'Later, start it with: sudo /scripts/cluster.municipio.sh start-arbitrator'
-        fi
-        ;;
-esac
-say 'Check the servers with: sudo /scripts/status.municipio.sh'
+cluster_next_steps

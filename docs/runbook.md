@@ -24,7 +24,7 @@ The configuration holds a **database root password** in addition to the applicat
 
 Answer *yes* to the wizard's advanced settings and choose Docker Swarm to set `DOCKER_SWARM=1`. Standalone initializes a one-node Swarm. In a cluster, bootstrap initializes the preferred VM as manager and the secondary joins as a worker. Swarm manages the application only; MariaDB and Caddy stay per-VM Compose services. See [Swarm mode](components/swarm.md) for the join sequence.
 
-If an earlier run saved `/etc/municipio/municipio.env` but did not finish, run the downloaded installer again and confirm the resume prompt. The lower-level `bin/install.sh --env-file` remains available for carefully reviewed reconfiguration from a local checkout; it is not the normal installation path.
+If an earlier run saved `/etc/municipio/municipio.env` but did not finish, run the downloaded installer again and confirm the resume prompt. On a cluster server it then continues with the same next step a fresh installation offers: starting the cluster on website server 1, or connecting website server 2. The lower-level `bin/install.sh --env-file` remains available for carefully reviewed reconfiguration from a local checkout; it is not the normal installation path.
 
 ## Migrating a host-installed node
 

@@ -27,6 +27,14 @@ The generated settings are at `/etc/municipio/municipio.env`, readable only by r
 
 The download URL will work once the repository's `main` branch is publicly published. If you prefer a branded URL such as `https://install.getmunicipio.com`, serve the repository's `installer.sh` over HTTPS at that address. The bootstrap script downloads the source bundle from the GitHub `main` branch by default; for releases, publish a versioned archive and update its source URL before advertising the installer. Do not advertise a domain until it actually serves the reviewed script.
 
+To test a branch before it is merged, download that branch's `installer.sh` and point it at the branch archive. Put the variable after `sudo`, which does not pass on variables set before it:
+
+```bash
+BRANCH=feat/my-branch
+curl -fL "https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/$BRANCH/installer.sh" -o installer.sh
+sudo MUNICIPIO_SOURCE_URL="https://github.com/helsingborg-stad/env-municipio-docker-vm/archive/refs/heads/$BRANCH.tar.gz" sh installer.sh
+```
+
 To remove the installation and return the VM to its original state, download and run the uninstaller the same way. It deletes the database, uploads and backups, and removes Docker Engine; see [Uninstalling](../README.md#uninstalling).
 
 ```bash

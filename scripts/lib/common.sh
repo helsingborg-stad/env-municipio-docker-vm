@@ -175,6 +175,16 @@ db_status_value() {
 start_database() { compose up -d --no-deps db; }
 start_proxy() { compose up -d --no-deps caddy; }
 
+# The same probe as the db healthcheck in compose.yaml. It logs in as root rather than
+# running the image's healthcheck.sh, whose 'healthcheck' account has a password each
+# container generates for itself: a Galera state transfer replaces the joiner's privilege
+# tables with the donor's but keeps the joiner's credential file, so that probe fails
+# forever on every node that joined. DB_ROOT_PASSWORD is identical on both data VMs.
+database_ready() {
+    [[ "$(docker exec -e MYSQL_PWD="$DB_ROOT_PASSWORD" "$1" mariadb -uroot --batch --skip-column-names \
+        -e "SELECT 1 FROM information_schema.ENGINES WHERE engine='InnoDB' AND support IN ('YES','DEFAULT')" 2>/dev/null)" == 1 ]]
+}
+
 # Standalone starts in under a minute. A cluster joiner may need a full state transfer
 # from the donor first, which is why the caller chooses the timeout.
 wait_for_database() {
@@ -182,7 +192,7 @@ wait_for_database() {
     local deadline=$((SECONDS + timeout)) id
     while true; do
         id="$(db_container 2>/dev/null || true)"
-        if [[ -n "$id" ]] && docker exec "$id" healthcheck.sh --connect --innodb_initialized >/dev/null 2>&1; then
+        if [[ -n "$id" ]] && database_ready "$id"; then
             return 0
         fi
         if ((SECONDS >= deadline)); then

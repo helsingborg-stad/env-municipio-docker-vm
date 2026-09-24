@@ -16,8 +16,16 @@ services:
       - "${DB_DATA_ROOT}:/var/lib/mysql"
       - "${DB_SOCKET_DIR}:/run/mysqld"
       - "${CONFIG_ROOT:-/etc/municipio}/mariadb:/etc/mysql/conf.d:ro"
+    # Root rather than the image's healthcheck.sh, which fails on every Galera joiner; see
+    # database_ready in scripts/lib/common.sh. $$ keeps the password out of the container
+    # configuration: the shell inside the container expands it.
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$$MARIADB_ROOT_PASSWORD" mariadb -uroot --batch --skip-column-names
+          -e "SELECT 1 FROM information_schema.ENGINES WHERE engine='InnoDB' AND support IN ('YES','DEFAULT')"
+          | grep -qx 1
       interval: 10s
       timeout: 5s
       retries: 6

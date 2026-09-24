@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
 source "$ROOT_DIR/scripts/lib/platform.sh"
 [[ $EUID -eq 0 ]] || { echo 'Please run the installer as administrator: sudo bash bin/interactive-install.sh' >&2; exit 1; }
 [[ -r /dev/tty ]] || { echo 'The installer asks questions, so it must be run from a terminal.' >&2; exit 1; }

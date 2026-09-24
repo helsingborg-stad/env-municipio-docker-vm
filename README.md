@@ -40,7 +40,7 @@ curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker
 sudo sh installer.sh
 ```
 
-The wizard asks for your hostname, website hostname, TLS choice, database credentials, and WordPress administrator. Press Enter to accept the standalone and Docker Compose defaults. When it finishes, the Caddy, MariaDB and Municipio containers are running and enabled for reboot. The effective configuration is stored at `/etc/municipio/municipio.env`; operational commands are installed under `/scripts`.
+The wizard first asks how many servers the site runs on; press Enter for a single server. It then asks only for the website address, who handles HTTPS, the WordPress administrator's email and a login password. Database passwords, the server name and address, and Docker Compose are chosen automatically; an optional *advanced settings* question lets experienced operators change them. When it finishes, the Caddy, MariaDB and Municipio containers are running and enabled for reboot. The effective configuration is stored at `/etc/municipio/municipio.env`; operational commands are installed under `/scripts`.
 
 The URL above becomes usable when this repository's `main` branch is published. A friendly download domain can serve the same `installer.sh` file; see [Quick start](docs/quick-start.md) for publishing and verification notes.
 

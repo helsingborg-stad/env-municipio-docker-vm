@@ -58,7 +58,7 @@ sudo docker exec -it municipio-db mariadb -uroot -p \
 
 In a cluster the change replicates, so update the file on **both** data VMs.
 
-In cluster modes the wizard requires both `DB_PASSWORD` and `DB_ROOT_PASSWORD` to be entered rather than generated, because a Galera state transfer replicates the privilege tables and both data VMs must agree. `cluster.municipio.sh join` verifies root access after the transfer and fails loudly on a mismatch.
+In cluster modes both data VMs must agree on `DB_PASSWORD` and `DB_ROOT_PASSWORD`, because a Galera state transfer replicates the privilege tables. The wizard therefore asks for one shared *cluster password* and derives both values from it, as the first 48 hex characters of `sha256("municipio:<label>:<cluster password>")` with the labels `db-password` and `db-root-password`. Typing the same cluster password on each VM gives identical credentials regardless of install order. To match a VM installed with hand-chosen values, enter them directly under the wizard's advanced settings. `cluster.municipio.sh join` verifies root access after the transfer and fails loudly on a mismatch.
 
 ## Modes
 

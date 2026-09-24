@@ -56,7 +56,7 @@ Treat a node with the marker set as not yet fully recovered.
 
 ### Shared credentials
 
-A state transfer overwrites the joiner's privilege tables with the donor's copy. Both data VMs must therefore be installed with the same `DB_PASSWORD` **and** the same `DB_ROOT_PASSWORD`; the wizard does not offer generated values in cluster mode for this reason. `cluster.municipio.sh join` verifies root access after the transfer completes and fails loudly on a mismatch instead of leaving it to be discovered at the next maintenance command.
+A state transfer overwrites the joiner's privilege tables with the donor's copy. Both data VMs must therefore be installed with the same `DB_PASSWORD` **and** the same `DB_ROOT_PASSWORD`; for this reason the wizard derives both from one shared cluster password instead of generating random values. `cluster.municipio.sh join` verifies root access after the transfer completes and fails loudly on a mismatch instead of leaving it to be discovered at the next maintenance command.
 
 ## The arbitrator is the documented exception
 

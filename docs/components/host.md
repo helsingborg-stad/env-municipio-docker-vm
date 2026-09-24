@@ -36,7 +36,7 @@ The downloaded `installer.sh` fetches the source bundle and runs `bin/interactiv
 
 The host component installs packages, creates `/etc/municipio`, `/opt/municipio` and the backup directory, copies the effective configuration to `/etc/municipio/municipio.env` with mode `0600`, and installs the Compose project files. The Compose project has to exist before the database component can start MariaDB.
 
-Standalone services are started before the wizard exits. Cluster services are prepared, then the wizard offers activation only when peers are ready.
+Standalone services are started before the wizard exits. Cluster services are prepared. The wizard then prints this server's name and address for the peers' installs, explains the activation order, and offers to activate only once the operator confirms the peers are ready.
 
 ## Supported platforms
 

@@ -47,6 +47,12 @@ EOF
     apt-get install -y "${packages[@]}"
 fi
 
+if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
+    # Started before the Docker check so that the other servers can still probe this one
+    # when Docker fails and the installation stops here.
+    systemctl enable --now glusterd
+fi
+
 if [[ "$NODE_ROLE" == data ]]; then
     command -v docker >/dev/null 2>&1 || die 'docker is required'
     systemctl cat docker.service >/dev/null 2>&1 || die 'Docker Engine service is missing; the Docker CLI alone is not sufficient'

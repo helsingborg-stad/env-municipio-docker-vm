@@ -74,18 +74,28 @@ export DEBIAN_FRONTEND=noninteractive
 # unknown, which caddy is once its repository has been removed.
 installed=()
 for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
-    docker-ce-rootless-extras glusterfs-server glusterfs-client galera-arbitrator-4 \
-    mariadb-server mariadb-client mariadb-backup galera-4 caddy; do
+    docker-ce-rootless-extras glusterfs-server glusterfs-client glusterfs-cli glusterfs-common \
+    galera-arbitrator-4 mariadb-server mariadb-client mariadb-backup galera-4 caddy; do
     dpkg-query -W -f '${Status}' "$pkg" 2>/dev/null | grep -q 'ok installed' && installed+=("$pkg")
 done
 ((${#installed[@]} == 0)) || apt-get purge -y "${installed[@]}"
-rm -rf /var/lib/docker /var/lib/containerd /etc/docker /var/lib/glusterd /etc/glusterfs /var/log/glusterfs
-# A noninteractive purge of mariadb-server keeps the databases, so remove them explicitly.
-rm -rf /var/lib/mysql /etc/mysql /var/log/mysql /etc/caddy /var/lib/caddy
+apt-get autoremove --purge -y
+# Deleted only once no installed package owns them: dpkg treats a removed conffile as
+# the admin's choice and never restores it, so a later reinstall would start without
+# e.g. /etc/glusterfs/glusterd.vol and glusterd would fail.
+# A noninteractive purge of mariadb-server keeps the databases, so they are listed here.
+for dir in /var/lib/docker /var/lib/containerd /etc/docker /var/lib/glusterd /etc/glusterfs \
+    /var/log/glusterfs /var/lib/mysql /etc/mysql /var/log/mysql /etc/caddy /var/lib/caddy; do
+    [[ -e $dir ]] || continue
+    if owner="$(dpkg-query -S "$dir" 2>/dev/null)"; then
+        echo "   Keeping $dir: still owned by ${owner%%:*}" >&2
+    else
+        rm -rf "$dir"
+    fi
+done
 rm -f /etc/apt/sources.list.d/docker.sources /etc/apt/keyrings/docker.asc \
     /etc/apt/sources.list.d/caddy-stable.list /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-getent group docker >/dev/null && groupdel docker
-apt-get autoremove --purge -y
+getent group docker >/dev/null && ! dpkg-query -W -f '${Status}' docker-ce 2>/dev/null | grep -q 'ok installed' && groupdel docker
 apt-get update
 
 echo '>> Done. Reboot recommended: sudo reboot'

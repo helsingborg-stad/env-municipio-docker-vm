@@ -1,10 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-[[ $# -eq 0 || ( $# -eq 1 && "$1" == --http-only ) ]] || {
-    echo 'Usage: build-caddy-sites.sh [--http-only]' >&2
-    exit 2
-}
+http_only=false
+required_host=
+while (($#)); do
+    case "$1" in
+        --http-only) http_only=true; shift ;;
+        --require-host)
+            [[ $# -ge 2 && -n "$2" ]] || {
+                echo 'Usage: build-caddy-sites.sh [--http-only] [--require-host HOST]' >&2
+                exit 2
+            }
+            required_host="$2"
+            shift 2
+            ;;
+        *)
+            echo 'Usage: build-caddy-sites.sh [--http-only] [--require-host HOST]' >&2
+            exit 2
+            ;;
+    esac
+done
 command -v idn2 >/dev/null || { echo 'idn2 is required' >&2; exit 1; }
 command -v psl >/dev/null || { echo 'psl is required' >&2; exit 1; }
 
@@ -39,12 +54,16 @@ normalize_host() {
     printf '%s\n' "$host"
 }
 
+[[ -z "$required_host" ]] || required_host="$(normalize_host "$required_host")"
+
 hosts_file="$(mktemp)"
 trap 'rm -f -- "$hosts_file"' EXIT
 count=0
+required_found=false
 while IFS= read -r raw || [[ -n "$raw" ]]; do
     [[ -n "$raw" ]] || continue
     host="$(normalize_host "$raw")"
+    [[ -z "$required_host" || "$host" != "$required_host" ]] || required_found=true
     printf '%s\n' "$host" >> "$hosts_file"
     count=$((count + 1))
     registered="$(psl --print-reg-domain -- "$host")" || die "public suffix lookup failed: $host"
@@ -53,8 +72,10 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
     fi
 done
 ((count > 0)) || die 'WordPress returned no site hostnames'
+[[ -z "$required_host" || "$required_found" == true ]] || \
+    die "setup hostname $required_host is missing from WordPress; existing Caddy routes were retained"
 
 while IFS= read -r host; do
-    [[ "${1:-}" == --http-only ]] && host="http://$host"
+    [[ "$http_only" == true ]] && host="http://$host"
     printf '%s {\n    import municipio_proxy\n}\n\n' "$host"
 done < <(LC_ALL=C sort -u "$hosts_file")

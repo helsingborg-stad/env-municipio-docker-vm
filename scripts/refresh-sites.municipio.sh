@@ -52,7 +52,7 @@ staging="$(mktemp -d)"
 previous="$(mktemp -d)"
 trap 'rm -rf -- "$staging" "$previous"' EXIT
 if [[ -n "$sites" ]]; then
-    generator_args=()
+    generator_args=(--require-host "$SITE_ADDRESS")
     [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == :80 ]] && generator_args+=(--http-only)
     printf '%s\n' "$sites" | bash /usr/local/lib/municipio/build-caddy-sites.sh \
         "${generator_args[@]}" > "$staging/municipio-sites.caddy"

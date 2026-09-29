@@ -141,6 +141,20 @@ if command -v psl >/dev/null 2>&1; then
     [[ "$site_list" == *'http://www.example.co.uk {'* ]]
     [[ "$site_list" == *'http://www.xn--bcher-kva.se {'* ]]
     [[ "$site_list" != *'www.blog.example.co.uk'* ]]
+    # The installer hostname must appear in WordPress's own list. An alias generated
+    # for an apex domain does not count as a registered WordPress site.
+    printf 'example.co.uk\nblog.example.co.uk\n' | \
+        bash scripts/lib/build-caddy-sites.sh --require-host example.co.uk >/dev/null
+    if printf 'example.co.uk\n' | \
+        bash scripts/lib/build-caddy-sites.sh --require-host www.example.co.uk >/dev/null 2>&1; then
+        echo 'ERROR: generated www alias satisfied the required WordPress hostname' >&2
+        exit 1
+    fi
+    if printf 'other.example.co.uk\n' | \
+        bash scripts/lib/build-caddy-sites.sh --require-host example.co.uk >/dev/null 2>&1; then
+        echo 'ERROR: missing setup hostname passed WordPress discovery' >&2
+        exit 1
+    fi
     [[ "$(psl --print-reg-domain example.co.uk)" == 'example.co.uk: example.co.uk' ]]
     [[ "$(psl --print-reg-domain blog.example.co.uk)" == 'blog.example.co.uk: example.co.uk' ]]
     for invalid in 'https://example.com:444' 'foo.com {' '127.0.0.1' 'foo.com/bar'; do

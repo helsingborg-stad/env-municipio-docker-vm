@@ -10,7 +10,7 @@ Serve every installed WordPress site on this VM, including inactive, archived, s
 
 The script uses `--skip-plugins --skip-themes` to keep discovery independent of plugin/theme health. For multisite, each site's `domain` column must contain its effective public hostname (including any mapped domain). If domain mapping exists only in a plugin and not in the WordPress multisite table, correct the WordPress source of truth first; the generator cannot safely infer that mapping.
 
-WP-CLI output is validated as a hostname. Unicode IDNs are converted to ASCII A-labels (`xn--...`) before insertion into Caddy; DNS and certificate names use those same A-labels. Invalid or empty output fails the refresh and leaves the previous list in place. Domains are sorted and deduplicated.
+WP-CLI output is validated as a hostname. Unicode IDNs are converted to ASCII A-labels (`xn--...`) before insertion into Caddy; DNS and certificate names use those same A-labels. Invalid or empty output fails the refresh and leaves the previous list in place. The setup hostname in `SITE_ADDRESS` must also appear explicitly in the WordPress result; a generated `www` alias does not count. If it is missing, refresh fails and keeps the existing Caddy routes. Domains are sorted and deduplicated.
 
 ## Apex and `www`
 
@@ -30,7 +30,7 @@ sudo cat /etc/municipio/caddy/municipio-sites.caddy
 sudo systemctl status municipio-sites.timer
 ```
 
-The refresh validates a candidate Caddyfile before installing it and reloads Caddy only when content changes. A failed WP-CLI query or validation keeps the previous list. On a fresh cluster VM, before the app is running, installation seeds the file from `SITE_ADDRESS`; bootstrap/join refreshes it from WordPress after starting the app. On an existing VM whose app is temporarily down, reinstall retains its existing list.
+The refresh validates a candidate Caddyfile before installing it and reloads Caddy only when content changes. A failed WP-CLI query or validation keeps the previous list. On a fresh cluster VM, before the app is running, installation seeds the file from `SITE_ADDRESS`; bootstrap/join refreshes it from WordPress after starting the app. If the setup hostname is absent from a multisite list, that refresh fails instead of removing its route. On an existing VM whose app is temporarily down, reinstall retains its existing list.
 
 When `CADDY_SITE_ADDRESS=:80`, each generated address has an explicit `http://` prefix, for upstream TLS termination. Otherwise Caddy manages HTTPS for each hostname. Public DNS, TLS validation, and the upstream HTTP load balancer must be ready for every hostname before traffic can work. The load balancer must preserve `Host`; `/healthz` checks should use a registered hostname.
 
@@ -38,4 +38,4 @@ In a two-node cluster, refresh runs on each VM against its own local container. 
 
 ## Changing a site's domain
 
-Change the domain in WordPress using a separate, reviewed database/content migration and update DNS and TLS first. The refresh command only discovers the result. For multisite, verify the site's `domain` field reflects the new hostname; for single-site, verify `home_url()` does. A force-SSL plugin changes the scheme, not historical hostnames in stored links.
+Change the domain in WordPress using a separate, reviewed database/content migration and update DNS and TLS first. If changing the setup hostname, update `SITE_ADDRESS` (and `CADDY_SITE_ADDRESS` when it is a hostname) on each data VM as part of the migration. The refresh command only discovers the result and refuses to apply a list missing the configured setup hostname. For multisite, verify the site's `domain` field reflects the new hostname; for single-site, verify `home_url()` does. A force-SSL plugin changes the scheme, not historical hostnames in stored links.

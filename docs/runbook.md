@@ -15,10 +15,12 @@ The exact port matrix is documented in [Network boundaries](components/network.m
 ## Interactive installation on the server
 
 ```bash
-curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh -o installer.sh
+curl -fL https://install.getmunicipio.com/installer.sh -o installer.sh
 sudo sh installer.sh
 sudo /scripts/status.municipio.sh
 ```
+
+If custom-domain HTTPS is still provisioning, use the [GitHub HTTPS installer](https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh) for the download.
 
 The configuration holds a **database root password** in addition to the application database password. In standalone mode the wizard generates both. In cluster mode it derives both from the shared cluster password, which must be typed identically on both data VMs; see [Configuration](configuration.md#credentials).
 

@@ -37,13 +37,13 @@ See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md)
 On a fresh VM with one of the supported releases, download the installer and run it locally:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh -o installer.sh
+curl -fL https://install.getmunicipio.com/installer.sh -o installer.sh
 sudo sh installer.sh
 ```
 
 The wizard first asks how many servers the site runs on; press Enter for a single server. It then asks only for the website address, who handles HTTPS, the WordPress administrator's email and a login password. Database passwords, the server name and address, and Docker Compose are chosen automatically; an optional *advanced settings* question lets experienced operators change them. When it finishes, the Caddy, MariaDB and Municipio containers are running and enabled for reboot. The effective configuration is stored at `/etc/municipio/municipio.env`; operational commands are installed under `/scripts`.
 
-The URL above becomes usable when this repository's `main` branch is published. A friendly download domain can serve the same `installer.sh` file; see [Quick start](docs/quick-start.md) for publishing and verification notes.
+The project documentation is published at [http://install.getmunicipio.com/](http://install.getmunicipio.com/). The custom domain serves the installer and uninstaller from this repository. If its HTTPS certificate is still provisioning, use GitHub HTTPS for the [installer](https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh) or [uninstaller](https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/uninstaller.sh) instead; see [Quick start](docs/quick-start.md).
 
 ```bash
 sudo /scripts/status.municipio.sh
@@ -62,7 +62,7 @@ There is no in-place conversion. Back up, then install the containerized version
 `uninstaller.sh` returns a VM to its pre-install state. Like the installer, it is downloaded and run on its own, with no clone needed:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/uninstaller.sh -o uninstaller.sh
+curl -fL https://install.getmunicipio.com/uninstaller.sh -o uninstaller.sh
 sudo sh uninstaller.sh        # asks for confirmation; --yes skips it
 sudo reboot
 ```

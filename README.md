@@ -43,7 +43,7 @@ sudo sh installer.sh
 
 The wizard first asks how many servers the site runs on; press Enter for a single server. It then asks only for the website address, who handles HTTPS, the WordPress administrator's email and a login password. Database passwords, the server name and address, and Docker Compose are chosen automatically; an optional *advanced settings* question lets experienced operators change them. When it finishes, the Caddy, MariaDB and Municipio containers are running and enabled for reboot. The effective configuration is stored at `/etc/municipio/municipio.env`; operational commands are installed under `/scripts`.
 
-The project documentation is published at [http://install.getmunicipio.com/](http://install.getmunicipio.com/). The custom domain serves the installer and uninstaller from this repository. If its HTTPS certificate is still provisioning, use GitHub HTTPS for the [installer](https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh) or [uninstaller](https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/uninstaller.sh) instead; see [Quick start](docs/quick-start.md).
+The project documentation is published at [http://install.getmunicipio.com/](http://install.getmunicipio.com/). The custom domain serves the installer and uninstaller from this repository.
 
 ```bash
 sudo /scripts/status.municipio.sh
@@ -68,9 +68,3 @@ sudo reboot
 ```
 
 It removes the containers, Swarm membership, systemd units, firewall rules, Gluster volume, every Municipio directory, and Docker Engine with all of its data. The database, uploads and backups under `BACKUP_ROOT` are deleted, so copy anything you need off the VM first. Docker Engine is removed even if it was present before the install. It also removes the MariaDB, Galera and Caddy packages that the earlier host-installed layout put on the VM, along with `/var/lib/mysql`, `/etc/mysql` and `/etc/caddy`, so a VM from that layout can be reinstalled cleanly. A MariaDB or Caddy installed for any other purpose is removed too. Base packages such as `curl`, `tar` and `rsync` are kept. In cluster modes, run it on every node, including the arbitrator.
-
-## Current maturity
-
-This is a reviewable version. Standalone installation is the first validation target. Cluster bootstrap and failover must be tested on disposable VMs before production use, especially firewall policy, Gluster healing, full-cluster restart, the Galera bootstrap flag lifecycle, and Municipio's behavior behind HTTPS.
-
-Run static checks with `make check`.

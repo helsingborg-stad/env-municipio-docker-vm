@@ -68,6 +68,8 @@ In cluster modes both data VMs must agree on `DB_PASSWORD` and `DB_ROOT_PASSWORD
 
 `cluster-arbitrator` additionally requires an independent arbitrator name and address. The third host stores no MariaDB data and only Gluster metadata.
 
+The local `NODE_NAME` and `NODE_ADDRESS` must match the primary, secondary, or arbitrator entry for that VM. All three entries need distinct names and addresses. The arbitrator uses `NODE_ROLE=arbiter` and does not run Swarm.
+
 ## Paths
 
 | Variable | Default | Notes |
@@ -82,6 +84,8 @@ In cluster modes both data VMs must agree on `DB_PASSWORD` and `DB_ROOT_PASSWORD
 | `HEALTH_ROOT` | `/var/lib/municipio/health` | The `/healthz` marker Caddy serves. |
 
 `DB_DATA_ROOT` must not be inside `DATA_ROOT` or `GLUSTER_BRICK`; `validate_config` refuses that, because a MariaDB data directory on replicated storage corrupts silently.
+
+`APP_BIND_ADDRESS` must remain `127.0.0.1`; the application port is for local Caddy only.
 
 `DB_SOCKET_DIR` is deliberately not under `/run`. That is a tmpfs, so the directory would be gone after a reboot and the database container would start with nowhere to create its socket.
 

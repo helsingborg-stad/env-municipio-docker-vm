@@ -4,13 +4,11 @@
 # `sudo sh uninstaller.sh` starts it under dash; re-run it under bash before any bash syntax.
 if [ -z "${BASH_VERSION:-}" ]; then exec bash "$0" "$@"; fi
 set -uo pipefail
-# Also removes Docker Engine and its data, even if Docker was on the VM before the install,
-# and the MariaDB and Caddy packages the earlier host-installed layout put on the VM.
+# Also removes Docker Engine and its data, even if Docker was on the VM before the install.
 [[ $EUID -eq 0 ]] || { echo "Run as root: sudo $0 [--yes]" >&2; exit 1; }
 
 if [[ "${1:-}" != --yes ]]; then
     echo 'This permanently deletes Municipio, its database, uploads, backups and Docker Engine.'
-    echo 'Any MariaDB or Caddy installed directly on this server is removed too, with its data.'
     read -r -p 'Type "yes" to continue: ' answer
     [[ "$answer" == yes ]] || { echo 'Aborted'; exit 1; }
 fi
@@ -58,24 +56,18 @@ if command -v gluster >/dev/null 2>&1; then
     systemctl disable --now glusterd 2>/dev/null
 fi
 
-# The host-installed layout ran MariaDB and Caddy as distribution services. Left behind,
-# they hold ports 3306 and 80/443, which the containers need, and keep the old database.
-echo '>> Stopping host-installed MariaDB and Caddy'
-systemctl disable --now mariadb caddy 2>/dev/null
-
 echo '>> Removing files and directories'
 rm -rf /scripts /usr/local/lib/municipio "$INSTALL_ROOT" "$CONFIG_ROOT" /var/lib/municipio \
     "$DATA_ROOT" "$GLUSTER_BRICK" /srv/municipio "$BACKUP_ROOT" /etc/default/garb /var/log/garb.log
 rmdir /srv 2>/dev/null
 
-echo '>> Purging packages (Docker, GlusterFS, Galera, host-installed MariaDB and Caddy)'
+echo '>> Purging packages (Docker, GlusterFS, Galera arbitrator)'
 export DEBIAN_FRONTEND=noninteractive
-# Only installed packages are named: apt-get refuses the whole purge when one name is
-# unknown, which caddy is once its repository has been removed.
+# Only installed packages are named so the purge works across deployment modes.
 installed=()
 for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
     docker-ce-rootless-extras glusterfs-server glusterfs-client glusterfs-cli glusterfs-common \
-    galera-arbitrator-4 mariadb-server mariadb-client mariadb-backup galera-4 caddy; do
+    galera-arbitrator-4; do
     dpkg-query -W -f '${Status}' "$pkg" 2>/dev/null | grep -q 'ok installed' && installed+=("$pkg")
 done
 ((${#installed[@]} == 0)) || apt-get purge -y "${installed[@]}"
@@ -83,9 +75,8 @@ apt-get autoremove --purge -y
 # Deleted only once no installed package owns them: dpkg treats a removed conffile as
 # the admin's choice and never restores it, so a later reinstall would start without
 # e.g. /etc/glusterfs/glusterd.vol and glusterd would fail.
-# A noninteractive purge of mariadb-server keeps the databases, so they are listed here.
 for dir in /var/lib/docker /var/lib/containerd /etc/docker /var/lib/glusterd /etc/glusterfs \
-    /var/log/glusterfs /var/lib/mysql /etc/mysql /var/log/mysql /etc/caddy /var/lib/caddy; do
+    /var/log/glusterfs; do
     [[ -e $dir ]] || continue
     if owner="$(dpkg-query -S "$dir" 2>/dev/null)"; then
         echo "   Keeping $dir: still owned by ${owner%%:*}" >&2
@@ -93,8 +84,7 @@ for dir in /var/lib/docker /var/lib/containerd /etc/docker /var/lib/glusterd /et
         rm -rf "$dir"
     fi
 done
-rm -f /etc/apt/sources.list.d/docker.sources /etc/apt/keyrings/docker.asc \
-    /etc/apt/sources.list.d/caddy-stable.list /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+rm -f /etc/apt/sources.list.d/docker.sources /etc/apt/keyrings/docker.asc
 getent group docker >/dev/null && ! dpkg-query -W -f '${Status}' docker-ce 2>/dev/null | grep -q 'ok installed' && groupdel docker
 apt-get update
 

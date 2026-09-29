@@ -18,11 +18,9 @@ Expose only web traffic publicly and restrict all replication to the cluster net
 | 24007-24008 | TCP | Gluster members | Gluster management. |
 | 49152-49251 | TCP | Gluster members | Gluster brick traffic. Narrow after confirming assigned brick ports. |
 
-This table is unchanged by containerization, and that was a design goal rather than a coincidence.
+## Database and proxy networking
 
-## Why the database moved into a container without changing the matrix
-
-The MariaDB and Caddy containers share the host network namespace. MariaDB keeps `bind-address=127.0.0.1`, so port 3306 is still bound to loopback and is still not used between nodes — Galera has its own replication ports. Galera advertises and binds the node's real address exactly as a host-installed server did, so cross-VM replication and state transfer need no NAT-aware provider options and the firewall policy is the same policy.
+The MariaDB and Caddy containers share the host network namespace. MariaDB uses `bind-address=127.0.0.1`, so port 3306 is bound to loopback and is not used between nodes — Galera has its own replication ports. Galera advertises and binds the node's real address, so cross-VM replication and state transfer need no NAT-aware provider options.
 
 The application reaches the database through the shared Unix socket, not over TCP. It is on a private Docker bridge network that the database container is not attached to, so there is no network path from the application to the database to firewall in the first place.
 

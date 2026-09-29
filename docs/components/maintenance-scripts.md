@@ -31,7 +31,7 @@ Both resolve the container first and fail with a distinct message when it is not
 
 ## Galera bootstrap flag
 
-`cluster.municipio.sh clear-bootstrap-flag` is new and has no host-installed equivalent. It exists because `--wsrep-new-cluster` is a persistent container argument rather than a one-shot systemd setting; see [MariaDB and Galera](database.md). `status.municipio.sh` reports the flag on every run until it is cleared.
+`cluster.municipio.sh clear-bootstrap-flag` clears the persistent `--wsrep-new-cluster` container argument after a peer has joined; see [MariaDB and Galera](database.md). `status.municipio.sh` reports the flag on every run until it is cleared.
 
 ## Status board
 

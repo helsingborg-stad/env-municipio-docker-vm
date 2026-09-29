@@ -10,7 +10,7 @@
 - Automatic package installation configures the official Docker repository for the detected distribution and codename. No database or web server package is installed: MariaDB and Caddy are digest-pinned container images. If conflicting Docker packages are already installed, remove or migrate them deliberately before running the installer. Alternatively set `INSTALL_PACKAGES=false` and preinstall all dependencies.
 - The VM needs outbound access to the container registries for the application, MariaDB and Caddy images.
 
-The exact port matrix is documented in [Network boundaries](components/network.md) and is unchanged by containerization. MariaDB port 3306 stays local; only Galera and Gluster replication ports cross between VMs.
+The exact port matrix is documented in [Network boundaries](components/network.md). MariaDB port 3306 stays local; only Galera and Gluster replication ports cross between VMs.
 
 ## Interactive installation on the server
 
@@ -28,33 +28,9 @@ Answer *yes* to the wizard's advanced settings and choose Docker Swarm to set `D
 
 If an earlier run saved `/etc/municipio/municipio.env` but did not finish, run the downloaded installer again and confirm the resume prompt. On a cluster server it then continues with the same next step a fresh installation offers: starting the cluster on website server 1, or connecting website server 2. The lower-level `bin/install.sh --env-file` remains available for carefully reviewed reconfiguration from a local checkout; it is not the normal installation path.
 
-## Migrating a host-installed node
-
-There is no in-place conversion from the previous host-installed layout. Migrate with a backup and a fresh install:
-
-1. On the existing node, take a backup and copy it off the VM:
-   ```bash
-   sudo /scripts/backup.municipio.sh pre-containerization
-   ```
-2. Install the containerized version on a fresh VM, or reinstall the node after removing the old `mariadb-server` and `caddy` packages.
-3. Restore the archive. There is no `mariadb` client on the host any more, so the dump
-   goes in through the database container:
-   ```bash
-   sudo /scripts/maintenance.municipio.sh on
-   # shellcheck disable=SC2154
-   DB_ROOT_PASSWORD="$(sudo sed -n "s/^DB_ROOT_PASSWORD='\(.*\)'$/\1/p" /etc/municipio/municipio.env)"
-   zcat database.sql.gz | sudo docker exec -i -e MYSQL_PWD="$DB_ROOT_PASSWORD" \
-     municipio-db mariadb -uroot municipio
-   sudo tar -C /srv/municipio/data -xzf files.tar.gz  # includes Caddy certificate data
-   sudo /scripts/maintenance.municipio.sh off
-   ```
-   Use the database name from `DB_NAME` if it is not the default.
-
-Do not point `DB_DATA_ROOT` at the old `/var/lib/mysql`. The image version is pinned by digest and may differ from the distribution package the directory was written by.
-
 ## Initialize a two-node cluster
 
-Run the wizard on both data VMs first. Use the same OS release for both data VMs and the arbitrator; the database and web server versions now come from pinned image digests, but GlusterFS still comes from the distribution. Choose the same number of servers and the same advanced settings, and enter identical shared settings, **including the cluster password and the WordPress password**. Use the correct node-specific name/address on each VM. The secondary should be prepared before bootstrapping the primary.
+Run the wizard on both data VMs first. Use the same OS release for both data VMs and the arbitrator; GlusterFS comes from the distribution. Choose the same number of servers and the same advanced settings, and enter identical shared settings, **including the cluster password and the WordPress password**. Use the correct node-specific name/address on each VM. The secondary should be prepared before bootstrapping the primary.
 
 On the preferred node only:
 
@@ -81,9 +57,9 @@ sudo /scripts/cluster.municipio.sh enable-node SECONDARY_HOSTNAME
 
 ### Then clear the bootstrap flag
 
-This step is new and is not optional.
+This step is required.
 
-The bootstrapped node's database container runs with `--wsrep-new-cluster`. Unlike the distribution's one-shot `galera_new_cluster` helper, a container keeps that argument across restarts, so rebooting the node would form a second primary component. Once the secondary is in the cluster, run on the **primary**:
+The bootstrapped node's database container runs with `--wsrep-new-cluster`. A container keeps that argument across restarts, so rebooting the node would form a second primary component. Once the secondary is in the cluster, run on the **primary**:
 
 ```bash
 sudo /scripts/cluster.municipio.sh clear-bootstrap-flag
@@ -115,8 +91,6 @@ sudo /scripts/update.municipio.sh \
 ```
 
 With Compose, update one node at a time. With Swarm, run the command **once on the manager**; the global service rolls tasks across both data VMs. Application updates never recreate the database container. After every node runs the same digest, drain both nodes briefly and run `cluster.municipio.sh clear-cache --all-nodes-drained` once before returning them to service.
-
-Existing installations with a node-local Caddy volume must [migrate it to Gluster](components/proxy-health.md#migrating-existing-caddy-volumes) before enabling shared TLS storage.
 
 ## Update the MariaDB or Caddy image
 

@@ -16,13 +16,13 @@ Three host paths are bind-mounted into the container:
 | `DB_SOCKET_DIR` | `/run/mysqld` | The Unix socket, shared with the application. |
 | `CONFIG_ROOT/mariadb` | `/etc/mysql/conf.d` (read-only) | The generated `60-municipio.cnf`. |
 
-The container shares the host network namespace. That keeps `bind-address=127.0.0.1`, the port matrix and Galera's replication behaviour identical to a host-installed server, which matters most on the cluster path. The trade-off is deliberate: the database container is not network-isolated from its own VM, but it is also never reachable over the network by anything else.
+The container shares the host network namespace. MariaDB binds client traffic to `127.0.0.1`, while Galera uses the VM's real address for replication. The database container is not network-isolated from its own VM, but its client port is not reachable from other VMs.
 
 `DB_SOCKET_DIR` is not under `/run`. That is a tmpfs, so the directory would be missing after a reboot and the container would start without a place to create its socket.
 
 ## How the application connects
 
-Unchanged: `DB_HOST=localhost:/run/mysqld/mysqld.sock`. The application container mounts `DB_SOCKET_DIR` read-only at the same `/run/mysqld` path, so both sides see the socket at the address WordPress already expects.
+The application uses `DB_HOST=localhost:/run/mysqld/mysqld.sock`. It mounts `DB_SOCKET_DIR` read-only at the same `/run/mysqld` path, so both containers see the socket at that address.
 
 Because every application connection arrives over the socket, it authenticates as `'user'@'localhost'`. The application account is never granted to a network host, and MariaDB's client port is not published from the container.
 
@@ -40,15 +40,15 @@ The ownership check is not ceremony: the socket directory is created on the host
 
 ## Cluster
 
-Both data VMs run the same image with `wsrep_on=ON`. The provider path (`/usr/lib/galera/libgalera_smm.so`), `wsrep_sst_method=rsync` and every other directive are the same values the distribution packages used; the official image ships the Galera provider, `rsync` and `mariabackup`.
+Both data VMs run the same image with `wsrep_on=ON`. The official image ships the Galera provider at `/usr/lib/galera/libgalera_smm.so`, `rsync` and `mariabackup`; state transfer uses `wsrep_sst_method=rsync`.
 
-Digest-pinning removes one failure mode the package-based setup had: both data VMs now run byte-identical database builds regardless of their OS release. Host OS releases still matter for GlusterFS, so keep the cluster hosts on the same release anyway.
+Digest-pinning gives both data VMs byte-identical database builds regardless of their OS release. Host OS releases still matter for GlusterFS, so keep the cluster hosts on the same release.
 
 The image's entrypoint disables the wsrep provider while it initializes a fresh data directory and loads Galera on the real start, so a joiner initializes cleanly before its state transfer.
 
-### Bootstrapping is no longer one-shot
+### Bootstrap flag
 
-`galera_new_cluster` was a distribution helper that applied `--wsrep-new-cluster` to exactly one systemd start. A container started with that argument keeps it forever, so an unattended reboot would form a **second** primary component — split brain.
+A container started with `--wsrep-new-cluster` keeps that argument across restarts, so an unattended reboot would form a **second** primary component — split brain.
 
 `cluster.municipio.sh bootstrap` and `failover.municipio.sh promote` therefore start MariaDB through `compose.galera-bootstrap.yaml` and record `CONFIG_ROOT/galera-bootstrap-active`. While that marker exists, `status.municipio.sh` reports it on every run. `cluster.municipio.sh clear-bootstrap-flag` recreates the container without the argument once the peer has joined; it refuses while `wsrep_cluster_size` is below 2 and verifies that the node returns to the Primary component afterwards.
 

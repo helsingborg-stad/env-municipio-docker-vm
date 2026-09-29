@@ -6,7 +6,7 @@ Turn a fresh supported Ubuntu or Debian amd64 VM into a predictable Municipio no
 
 ## What the host actually runs
 
-After the containerization refactor the host layer is:
+The host layer is:
 
 | Layer | Provided by |
 | --- | --- |
@@ -19,7 +19,7 @@ After the containerization refactor the host layer is:
 | Health evaluation | `municipio-health.timer` systemd timer |
 | Caddy boot ordering | `municipio-caddy.service` systemd unit, after the data mount |
 
-A data VM installs no database server and no web server. The Caddy apt repository and its signing key are no longer configured at all.
+A data VM installs no database server and no web server. It does not configure a Caddy apt repository.
 
 The remaining host packages are `gzip`, `tar` and `util-linux` for backups and locking, plus `ca-certificates`, `curl` and `gnupg` for repository setup. Data VMs also install `idn2` and `psl` to validate internationalized WordPress hostnames and identify apex domains.
 
@@ -43,7 +43,7 @@ Standalone services are started before the wizard exits. Cluster services are pr
 
 The installer supports Ubuntu 22.04 (Jammy), 24.04 (Noble) and 26.04 (Resolute) LTS, plus Debian 12 (Bookworm) and 13 (Trixie), on amd64. It reads `/etc/os-release` and chooses the matching official Docker Engine repository.
 
-Containerization narrowed what the OS release actually decides. MariaDB and Caddy versions now come from pinned image digests instead of the distribution, so two data VMs cannot end up with mismatched database builds. The distribution still provides GlusterFS, so cluster hosts should stay on the same release.
+MariaDB and Caddy versions come from pinned image digests, so two data VMs use the same database build. The distribution provides GlusterFS, so cluster hosts should stay on the same release.
 
 Set `INSTALL_PACKAGES=false` when a VM template or configuration-management system supplies the dependencies.
 

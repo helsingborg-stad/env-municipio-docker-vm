@@ -28,7 +28,7 @@ The design deliberately has no database load balancer, shared database endpoint,
 - Maintenance commands are installed in `/scripts`.
 - `DOCKER_SWARM=1` runs one coordinated Swarm service across the data VMs, with one local application task per VM. Swarm manages the application only.
 
-The MariaDB and Caddy containers share the host network namespace. That keeps the published port matrix, the firewall policy and Galera's replication behaviour identical to the previous host-installed design; see [Architecture](docs/architecture.md) for the trade-off.
+The MariaDB and Caddy containers share the host network namespace so Galera can use the VMs' real addresses and Caddy can reach the local application over loopback; see [Architecture](docs/architecture.md) for the trade-off.
 
 See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md), [Docker Swarm mode](docs/components/swarm.md), [Host preparation](docs/components/host.md), [Network boundaries](docs/components/network.md), [WordPress site discovery](docs/site-discovery.md), and the [Runbook](docs/runbook.md).
 
@@ -53,10 +53,6 @@ sudo /scripts/backup.municipio.sh manual
 
 For the short walkthrough, see [Quick start](docs/quick-start.md). Two-VM and Swarm setups require peer coordination; see the [Runbook](docs/runbook.md).
 
-## Migrating from the host-installed layout
-
-There is no in-place conversion. Back up, then install the containerized version on a fresh VM and restore. See [Runbook](docs/runbook.md#migrating-a-host-installed-node).
-
 ## Uninstalling
 
 `uninstaller.sh` returns a VM to its pre-install state. Like the installer, it is downloaded and run on its own, with no clone needed:
@@ -67,4 +63,4 @@ sudo sh uninstaller.sh        # asks for confirmation; --yes skips it
 sudo reboot
 ```
 
-It removes the containers, Swarm membership, systemd units, firewall rules, Gluster volume, every Municipio directory, and Docker Engine with all of its data. The database, uploads and backups under `BACKUP_ROOT` are deleted, so copy anything you need off the VM first. Docker Engine is removed even if it was present before the install. It also removes the MariaDB, Galera and Caddy packages that the earlier host-installed layout put on the VM, along with `/var/lib/mysql`, `/etc/mysql` and `/etc/caddy`, so a VM from that layout can be reinstalled cleanly. A MariaDB or Caddy installed for any other purpose is removed too. Base packages such as `curl`, `tar` and `rsync` are kept. In cluster modes, run it on every node, including the arbitrator.
+It removes the containers, Swarm membership, systemd units, firewall rules, Gluster volume, every Municipio directory, and Docker Engine with all of its data. The database, uploads and backups under `BACKUP_ROOT` are deleted, so copy anything you need off the VM first. Docker Engine is removed even if it was present before the install. Base packages such as `curl`, `tar` and `rsync` are kept. In cluster modes, run it on every node, including the arbitrator.

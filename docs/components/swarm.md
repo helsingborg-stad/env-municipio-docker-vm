@@ -16,13 +16,13 @@ The default is `DOCKER_SWARM=0`, which uses Docker Compose. `DEPLOYMENT_MODE=sta
 
 `compose.swarm.yaml` contains exactly one service: the application. MariaDB and Caddy are always per-VM Compose services from `compose.yaml`, in both runtime modes.
 
-That is the same split the host-installed design had, where MariaDB and Caddy were per-VM systemd services and Swarm managed only the application. Both own node-local state — a data directory, a socket, ACME certificates, ports 80/443 — that must never be rescheduled onto another VM. `tests/check.sh` asserts that no `db` or `caddy` service appears in `compose.swarm.yaml`.
+MariaDB and Caddy own node-local state — a data directory, a socket, ACME certificates, ports 80/443 — that must never be rescheduled onto another VM. `tests/check.sh` asserts that no `db` or `caddy` service appears in `compose.swarm.yaml`.
 
 ## Topology
 
 The preferred data VM is the Swarm manager. The second data VM joins as a worker. The service has `mode: global` and a `municipio.data=true` node constraint, so it starts exactly one task on each enabled data VM. The optional Galera/Gluster arbitrator is outside the Swarm.
 
-The service publishes its port in host mode. Caddy on each VM reaches its **local** task at `127.0.0.1:8080`. Swarm's routing mesh is not used, because it could route a request to another VM's task while the local database and filesystem are unavailable. Because the Caddy container shares the host network namespace, that loopback address means the same thing to it as it did to a host-installed Caddy.
+The service publishes its port in host mode. Caddy on each VM reaches its **local** task at `127.0.0.1:8080`. Swarm's routing mesh is not used, because it could route a request to another VM's task while the local database and filesystem are unavailable. The Caddy container shares the host network namespace, so it can reach that loopback address.
 
 The manager controls image updates for both nodes. Swarm replaces tasks one at a time with `stop-first` and rolls back a failed service update. The local `/healthz` endpoint continues to evaluate the application, local MariaDB, and local storage together. The external HTTP round-robin service checks that endpoint.
 

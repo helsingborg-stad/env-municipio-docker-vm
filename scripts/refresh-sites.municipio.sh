@@ -107,16 +107,6 @@ docker image inspect "$CADDY_IMAGE" >/dev/null 2>&1 || docker pull -q "$CADDY_IM
 docker run --rm -v "$staging:/etc/caddy:ro" "$CADDY_IMAGE" \
     caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
-# Older installations kept /data in a node-local named volume. Require an
-# explicit, one-time migration from one node before switching storage.
-if [[ ! -f "$DATA_ROOT/caddy/.legacy-data-migrated" ]] && \
-    docker volume inspect municipio_caddy_data >/dev/null 2>&1 && \
-    docker run --rm --entrypoint sh -v municipio_caddy_data:/old:ro "$CADDY_IMAGE" \
-        -c '[ -n "$(ls -A /old)" ]'; then
-    [[ -f "$DATA_ROOT/caddy/.legacy-data-migrated" ]] || \
-        die 'Existing local Caddy data must be migrated into DATA_ROOT/caddy before switching to shared storage; see docs/components/proxy-health.md'
-fi
-
 if cmp -s "$staging/Caddyfile" "$main_file" && \
     cmp -s "$staging/municipio-sites.caddy" "$sites_file"; then
     # Compose also applies a changed image or mount definition when the generated
@@ -129,8 +119,7 @@ fi
 [[ ! -f "$sites_file" ]] || cp -p "$sites_file" "$previous/municipio-sites.caddy"
 install -m 0644 "$staging/municipio-sites.caddy" "$sites_file"
 install -m 0644 "$staging/Caddyfile" "$main_file"
-# Compose recreates an existing Caddy container when its /data mount changes from
-# the old named volume to the Gluster-backed bind mount. A reload alone cannot do that.
+# Compose applies any changed image or mount definition before reloading Caddy.
 activated=false
 if start_proxy && compose exec -T caddy caddy reload \
     --config /etc/caddy/Caddyfile --adapter caddyfile; then

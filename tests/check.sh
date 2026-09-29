@@ -123,7 +123,7 @@ grep -Fq 'tar -C "$DATA_ROOT" -czf "$target/files.tar.gz" uploads cache caddy' s
 grep -Fq 'install -d -m 0700 "$DATA_ROOT/caddy"' scripts/cluster.municipio.sh
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 
-# No component may reintroduce a host-installed database or web server.
+# The installer must not install a database or web server package on data VMs.
 if grep -nE 'apt-get install[^|]*\b(mariadb-server|mariadb-client|mariadb-backup|caddy)\b' \
     scripts/install/*.sh; then
     echo 'ERROR: a host database or web server package is being installed' >&2

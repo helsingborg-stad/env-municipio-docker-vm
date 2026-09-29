@@ -8,7 +8,7 @@ The installed file is `/etc/municipio/municipio.env`, owned by root with mode `0
 
 ## The file has two readers
 
-This matters more than it used to. The file is read by:
+The file is read by:
 
 1. `bash source`, in the maintenance scripts; and
 2. **Docker Compose's dotenv parser**, which supplies container environments.
@@ -43,11 +43,11 @@ Set `DOCKER_SWARM=1` to use Swarm instead of Compose. It defaults to `0`. In a t
 
 All three services are pinned by digest and `validate_config` rejects mutable tags for every one of them. `update.municipio.sh` likewise requires a digest.
 
-`MARIADB_IMAGE` and `CADDY_IMAGE` replace what were previously distribution packages. Changing either one is a deliberate operator action, not a side effect of an application deployment; there is no automatic database upgrade on image change.
+Changing `MARIADB_IMAGE` or `CADDY_IMAGE` is a deliberate operator action, not a side effect of an application deployment; there is no automatic database upgrade on image change.
 
 ## Credentials
 
-`DB_ROOT_PASSWORD` is new. It initializes the database container's `root@localhost` account and is used by maintenance commands. The image is also given `MARIADB_ROOT_HOST=localhost`, so no `root@'%'` account is created.
+`DB_ROOT_PASSWORD` initializes the database container's `root@localhost` account and is used by maintenance commands. The image is also given `MARIADB_ROOT_HOST=localhost`, so no `root@'%'` account is created.
 
 Editing `DB_ROOT_PASSWORD` in this file after installation does **not** change the password. The image applies it only when it initializes an empty data directory; afterwards the credential lives in the database itself, and every later maintenance command would fail with "Access denied". To rotate it, change the account first and then update the file:
 

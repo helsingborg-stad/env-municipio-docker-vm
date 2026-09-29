@@ -10,7 +10,7 @@ Run an immutable Municipio release and replace it consistently without building 
 
 The selected release is pinned by OCI digest. The current example points to the index digest published for `6.2.5`.
 
-The container reaches MariaDB through a read-only bind mount of `DB_SOCKET_DIR` at `/run/mysqld` and a Unix socket connection. `WP_CONF_DB_HOST` is unchanged by containerization: it is still `localhost:/run/mysqld/mysqld.sock`. The application container has no network route to the database at all — it does not share a Docker network with it, and MariaDB publishes no port.
+The container reaches MariaDB through a read-only bind mount of `DB_SOCKET_DIR` at `/run/mysqld` and a Unix socket connection. `WP_CONF_DB_HOST` is `localhost:/run/mysqld/mysqld.sock`. The application container has no network route to the database at all — it does not share a Docker network with it, and MariaDB publishes no port.
 
 Persistent writable paths are bind-mounted from `DATA_ROOT`.
 

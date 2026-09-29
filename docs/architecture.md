@@ -51,17 +51,17 @@ The HTTP round-robin layer is outside this repository. It must health-check `/he
 
 Each application container connects to the MariaDB container on its own VM through a shared Unix socket. `DB_SOCKET_DIR` is bind-mounted read-write into the database container and read-only into the application container, both at `/run/mysqld`.
 
-`DB_HOST=localhost:/run/mysqld/mysqld.sock` is therefore unchanged from the host-installed design. It is not a remote or shared database address, port 3306 is not published, and the application container is not attached to any Docker network the database can be reached on.
+`DB_HOST=localhost:/run/mysqld/mysqld.sock` is a local Unix socket address. It is not a remote or shared database address, port 3306 is not published, and the application container is not attached to any Docker network the database can be reached on.
 
 ## Container network placement
 
 | Service | Network | Why |
 | --- | --- | --- |
-| MariaDB | Host namespace | Keeps `bind-address`, the port matrix and Galera replication identical to a host-installed server. |
+| MariaDB | Host namespace | Binds local client traffic to loopback and Galera traffic to the VM's real address. |
 | Caddy | Host namespace | Owns 80/443 directly, sees real client addresses, reaches the local application over loopback in both runtime modes. |
 | Municipio | Private bridge | Published only on `127.0.0.1:8080`. Reaches the database by socket, not by network. |
 
-Sharing the host namespace for two of the three containers is a deliberate trade. It gives up network isolation between those containers and their own VM, and in exchange the security boundary, the firewall policy and the cluster replication behaviour are the ones that were already reviewed — which matters most on the cluster path, the least-tested part of this repository.
+Sharing the host namespace for two of the three containers is a deliberate trade. It gives up network isolation between those containers and their own VM, while allowing direct access to host ports and the VM's real address for Galera replication.
 
 ## State ownership
 

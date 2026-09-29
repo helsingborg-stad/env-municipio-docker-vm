@@ -4,6 +4,8 @@ source "${MUNICIPIO_REPO_ROOT}/scripts/lib/common.sh"
 load_config
 
 if [[ "$NODE_ROLE" == arbiter ]]; then
+    # garbd is not part of the MariaDB image and the arbitrator runs no container at
+    # all, so it stays a host package on this quorum-only witness host.
     cat > /etc/default/garb <<EOF
 GALERA_NODES="${PRIMARY_NODE_ADDRESS}:4567,${SECONDARY_NODE_ADDRESS}:4567"
 GALERA_GROUP="municipio"
@@ -16,19 +18,17 @@ EOF
     exit 0
 fi
 
-if [[ "${INSTALL_PACKAGES:-true}" == true ]]; then
-    export DEBIAN_FRONTEND=noninteractive
-    packages=(mariadb-server mariadb-backup)
-    [[ "$DEPLOYMENT_MODE" != standalone ]] && packages+=(galera-4 rsync)
-    apt-get install -y "${packages[@]}"
-fi
-
-cnf=/etc/mysql/mariadb.conf.d/60-municipio.cnf
+# The container reads every file in this directory through the image's
+# `!includedir /etc/mysql/conf.d/`.
+conf_dir="$CONFIG_ROOT/mariadb"
+cnf="$conf_dir/60-municipio.cnf"
+install -d -m 0755 "$conf_dir"
 tmp_cnf="$(mktemp)"
 trap 'rm -f "$tmp_cnf"' EXIT
-install -d -m 0755 "$(dirname "$cnf")"
 {
     echo '[mysqld]'
+    # The container shares the host network namespace, so this is the host loopback.
+    # Client traffic never leaves the VM; the application uses the Unix socket.
     echo 'bind-address=127.0.0.1'
     echo 'skip-name-resolve=1'
     if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
@@ -53,34 +53,24 @@ if [[ -f "$cnf" ]] && cmp -s "$tmp_cnf" "$cnf"; then
     config_changed=false
 fi
 
-if [[ "$DEPLOYMENT_MODE" != standalone && -f /etc/municipio/cluster-initialized && "$config_changed" == true ]]; then
+if [[ "$DEPLOYMENT_MODE" != standalone && -f "$CONFIG_ROOT/cluster-initialized" && "$config_changed" == true ]]; then
     die 'Live Galera configuration differs; apply it with a planned rolling maintenance procedure'
 fi
 install -m 0644 "$tmp_cnf" "$cnf"
 
 if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
-    systemctl enable mariadb
+    docker pull -q "$MARIADB_IMAGE" >/dev/null
     if [[ "$config_changed" == true ]]; then
-        systemctl restart mariadb
+        compose up -d --no-deps --force-recreate db
     else
-        systemctl start mariadb
+        start_database
     fi
-    db_name="$(sql_escape "$DB_NAME")"
-    db_user="$(sql_escape "$DB_USER")"
-    db_password="$(sql_escape "$DB_PASSWORD")"
-    mariadb <<SQL
-CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_password}';
-ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${db_password}';
-GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
-FLUSH PRIVILEGES;
-SQL
+    wait_for_database 300 || die 'MariaDB container did not become available'
+    verify_socket_ownership
+    provision_database
+elif [[ ! -f "$CONFIG_ROOT/cluster-initialized" ]]; then
+    compose stop db >/dev/null 2>&1 || true
+    log 'Galera configured but stopped pending explicit bootstrap/join'
 else
-    if [[ ! -f /etc/municipio/cluster-initialized ]]; then
-        systemctl disable mariadb >/dev/null 2>&1 || true
-        systemctl stop mariadb >/dev/null 2>&1 || true
-        log "Galera configured but stopped pending explicit bootstrap/join"
-    else
-        log "Existing Galera node left running"
-    fi
+    log 'Existing Galera node left running'
 fi

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Installed by install/maintenance.sh; the repository copy is scripts/lib/common.sh.
+# shellcheck disable=SC1091
 source /usr/local/lib/municipio/common.sh
 load_config
 [[ "$DOCKER_SWARM" == 1 ]] || exit 0

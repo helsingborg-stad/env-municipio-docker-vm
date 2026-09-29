@@ -1,8 +1,8 @@
 [Unit]
 Description=Municipio node health evaluation
-After=docker.service mariadb.service caddy.service
+# MariaDB and Caddy run as containers, so docker.service is the only local dependency.
+After=docker.service
 
 [Service]
 Type=oneshot
 ExecStart=/scripts/health.municipio.sh
-

@@ -10,10 +10,12 @@ platform_supported() {
     esac
 }
 
+# Sets PLATFORM_ID, PLATFORM_VERSION, PLATFORM_CODENAME and PLATFORM_ARCH for the caller.
+# shellcheck disable=SC2034
 detect_platform() {
     local release_file="${1:-/etc/os-release}"
     local architecture="${2:-$(dpkg --print-architecture)}"
-    local ID= VERSION_ID= VERSION_CODENAME= UBUNTU_CODENAME=
+    local ID='' VERSION_ID='' VERSION_CODENAME='' UBUNTU_CODENAME=''
     [[ -r "$release_file" ]] || { printf 'Cannot read %s\n' "$release_file" >&2; return 1; }
     # shellcheck disable=SC1090
     source "$release_file"

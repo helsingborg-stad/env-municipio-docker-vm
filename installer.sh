@@ -21,8 +21,17 @@ trap 'rm -rf -- "$work_dir"' EXIT HUP INT TERM
 echo 'Downloading Municipio installer bundle...'
 curl --fail --location --show-error --silent --retry 3 \
     "$MUNICIPIO_SOURCE_URL" -o "$work_dir/source.tar.gz"
-tar -xzf "$work_dir/source.tar.gz" -C "$work_dir"
-source_dir="$work_dir/env-municipio-docker-vm-main"
+mkdir "$work_dir/source"
+tar -xzf "$work_dir/source.tar.gz" -C "$work_dir/source"
+# GitHub names the archive's single top-level directory after the ref, such as
+# env-municipio-docker-vm-main or env-municipio-docker-vm-feat-some-branch, so it is
+# discovered rather than assumed. Any other MUNICIPIO_SOURCE_URL then works too.
+set -- "$work_dir/source"/*
+if [ "$#" -ne 1 ] || [ ! -d "$1" ]; then
+    echo 'Downloaded bundle must contain exactly one top-level directory' >&2
+    exit 1
+fi
+source_dir="$1"
 if [ ! -f "$source_dir/bin/interactive-install.sh" ] || [ ! -f "$source_dir/bin/install.sh" ]; then
     echo 'Downloaded bundle does not contain the expected installer' >&2
     exit 1

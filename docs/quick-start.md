@@ -3,7 +3,7 @@
 On a fresh Ubuntu Server 22.04/24.04/26.04 LTS or Debian 12/13 amd64 VM, run:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh -o installer.sh
+curl -fL https://install.getmunicipio.com/installer.sh -o installer.sh
 sudo sh installer.sh
 ```
 
@@ -28,7 +28,7 @@ If setup stops after saving the configuration, run `sudo sh installer.sh` again 
 
 The generated settings are at `/etc/municipio/municipio.env`, readable only by root. Generated passwords are not printed. If the WordPress password was generated, the wizard ends by showing the `sudo grep WP_ADMIN_PASSWORD …` command that reveals it. Values are written single-quoted, because the file is read both by bash and by Docker Compose's dotenv parser — keep that form if you edit it. To update the application image later, use `/scripts/update.municipio.sh` with an exact image digest; the MariaDB and Caddy images have their own deliberate procedure in the [runbook](runbook.md).
 
-The download URL will work once the repository's `main` branch is publicly published. If you prefer a branded URL such as `https://install.getmunicipio.com`, serve the repository's `installer.sh` over HTTPS at that address. The bootstrap script downloads the source bundle from the GitHub `main` branch by default; for releases, publish a versioned archive and update its source URL before advertising the installer. Do not advertise a domain until it actually serves the reviewed script.
+The documentation is published at [http://install.getmunicipio.com/](http://install.getmunicipio.com/). The custom domain serves the installer and uninstaller from this repository. If the HTTPS certificate is still provisioning, use GitHub HTTPS for the [installer](https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh) or [uninstaller](https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/uninstaller.sh) download instead. The bootstrap script downloads the source bundle from the GitHub `main` branch over HTTPS.
 
 To test a branch before it is merged, download that branch's `installer.sh` and point it at the branch archive. Put the variable after `sudo`, which does not pass on variables set before it:
 
@@ -41,7 +41,7 @@ sudo MUNICIPIO_SOURCE_URL="https://github.com/helsingborg-stad/env-municipio-doc
 To remove the installation and return the VM to its original state, download and run the uninstaller the same way. It deletes the database, uploads and backups, and removes Docker Engine and any MariaDB or Caddy installed directly on the VM by the earlier host-installed layout; see [Uninstalling](../README.md#uninstalling).
 
 ```bash
-curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/uninstaller.sh -o uninstaller.sh
+curl -fL https://install.getmunicipio.com/uninstaller.sh -o uninstaller.sh
 sudo sh uninstaller.sh
 ```
 

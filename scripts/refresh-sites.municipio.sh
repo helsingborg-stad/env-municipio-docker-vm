@@ -45,6 +45,7 @@ else
         single) sites="$(wp_cli eval 'echo home_url();')" || die 'WP-CLI could not read the site URL' ;;
         *) die "Unexpected WP-CLI installation mode: $mode" ;;
     esac
+    [[ -n "$sites" ]] || die 'WordPress returned no site hostnames; the existing Caddy site list was retained'
 fi
 
 staging="$(mktemp -d)"
@@ -86,7 +87,7 @@ docker run --rm -v "$staging:/etc/caddy:ro" "$CADDY_IMAGE" \
 
 if cmp -s "$staging/Caddyfile" "$main_file" && \
     cmp -s "$staging/municipio-sites.caddy" "$sites_file"; then
-    start_proxy
+    container_running caddy || start_proxy
     exit 0
 fi
 

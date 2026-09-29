@@ -163,4 +163,19 @@ reject_config 'a database directory inside GLUSTER_BRICK' \
     sed 's|^DB_DATA_ROOT=.*$|DB_DATA_ROOT=/srv/municipio/gluster-brick/mysql|'
 reject_config 'a missing database root password' sed 's|^DB_ROOT_PASSWORD=.*$||'
 
+# The status board must render every layout without touching the system. The demo
+# cluster contains a failure, so exit status 2 is the expected result.
+for layout in standalone cluster arbiter; do
+    monitor_status=0
+    bash scripts/monitor.municipio.sh --demo "$layout" --no-color > /dev/null || monitor_status=$?
+    [[ "$monitor_status" -ge 1 ]] || { echo "ERROR: monitor demo $layout did not report its sample problems" >&2; exit 1; }
+done
+# Captured first: the demo exits non-zero, which pipefail would turn into a pass.
+# Fix hints ("->") are commands to paste and are exempt from the width limit.
+monitor_screen="$(bash scripts/monitor.municipio.sh --demo cluster --no-color || true)"
+if grep -v '^ *-> ' <<< "$monitor_screen" | awk 'length > 80 {found = 1} END {exit !found}'; then
+    echo 'ERROR: the monitor screen is wider than 80 columns' >&2
+    exit 1
+fi
+
 echo 'Static checks passed'

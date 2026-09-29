@@ -92,6 +92,7 @@ It refuses while `wsrep_cluster_size` is below 2, and verifies that the node ret
 Then validate from both:
 
 ```bash
+sudo /scripts/monitor.municipio.sh
 sudo /scripts/status.municipio.sh
 curl -fsS https://www.example.se/healthz
 ```

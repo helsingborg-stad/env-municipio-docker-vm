@@ -4,7 +4,7 @@ source "${MUNICIPIO_REPO_ROOT}/scripts/lib/common.sh"
 load_config
 
 install -d -m 0755 /scripts
-for script in update status maintenance backup health cluster failover swarm-firewall; do
+for script in update status monitor maintenance backup health cluster failover swarm-firewall; do
     install -m 0750 "$MUNICIPIO_REPO_ROOT/scripts/${script}.municipio.sh" "/scripts/${script}.municipio.sh"
 done
 install -d -m 0755 /usr/local/lib/municipio

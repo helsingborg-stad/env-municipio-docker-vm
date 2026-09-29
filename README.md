@@ -30,7 +30,7 @@ The design deliberately has no database load balancer, shared database endpoint,
 
 The MariaDB and Caddy containers share the host network namespace so Galera can use the VMs' real addresses and Caddy can reach the local application over loopback; see [Architecture](docs/architecture.md) for the trade-off.
 
-See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md), [Docker Swarm mode](docs/components/swarm.md), [Host preparation](docs/components/host.md), [Network boundaries](docs/components/network.md), [WordPress site discovery](docs/site-discovery.md), and the [Runbook](docs/runbook.md).
+See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md), [Docker Swarm mode](docs/components/swarm.md), [Host preparation](docs/components/host.md), [Network boundaries](docs/components/network.md), [Outbound connections](docs/outbound-connections.md), [WordPress site discovery](docs/site-discovery.md), and the [Runbook](docs/runbook.md).
 
 ## Quick start: standalone
 

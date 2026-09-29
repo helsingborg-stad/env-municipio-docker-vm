@@ -12,7 +12,7 @@ Like the database container it uses the host network namespace, so it owns ports
 
 | Mount | Purpose |
 | --- | --- |
-| `CONFIG_ROOT/caddy` → `/etc/caddy` (read-only) | The generated `Caddyfile`. |
+| `CONFIG_ROOT/caddy` → `/etc/caddy` (read-only) | The generated `Caddyfile` and site fragment. |
 | `HEALTH_ROOT` → `/var/lib/municipio/health` (read-only) | The health marker `/healthz` is served from. |
 | `caddy_data` volume → `/data` | ACME certificates and account keys. |
 | `caddy_config` volume → `/config` | Caddy's autosaved configuration. |
@@ -23,9 +23,9 @@ The **directory** is mounted rather than the `Caddyfile` itself. Replacing a bin
 
 ## Configuration changes
 
-`install/proxy.sh` writes the candidate `Caddyfile` to a staging directory and validates it with `docker run --rm ... caddy validate` before installing it. Validate-then-install is why a broken configuration never reaches the running proxy.
+`refresh-sites.municipio.sh` discovers WordPress hostnames and writes a candidate `Caddyfile` and `municipio-sites.caddy` fragment to a staging directory. It validates them with the pinned Caddy image before installing them. See [WordPress site discovery](../site-discovery.md).
 
-If the file changed and the container is already running, the installer issues `caddy reload`, which re-reads the bind-mounted file in place. Otherwise it starts the container.
+If either file changed and the container is already running, the refresh command issues `caddy reload`, which re-reads the bind-mounted directory. Otherwise it starts the container.
 
 ## Health
 
@@ -51,4 +51,4 @@ Only the database access path changed: the script now asks MariaDB inside its co
 
 An upstream HTTP load balancer should treat every non-2xx response as unhealthy. DNS round-robin without active healthchecks is not sufficient for failover.
 
-Caddy automatic TLS is suitable for standalone. In a multi-node deployment, terminating TLS at the upstream load balancer avoids distributed ACME challenge state; configure `CADDY_SITE_ADDRESS=:80` in that case. The load balancer must preserve the public `Host` header. In this mode Caddy explicitly sends `X-Forwarded-Proto: https` to the loopback-only application.
+Caddy automatic TLS is suitable for standalone. In a multi-node deployment, terminating TLS at the upstream load balancer avoids distributed ACME challenge state; configure `CADDY_SITE_ADDRESS=:80` in that case. The load balancer must preserve the public `Host` header, including for health checks. In this mode Caddy explicitly sends `X-Forwarded-Proto: https` to the loopback-only application.

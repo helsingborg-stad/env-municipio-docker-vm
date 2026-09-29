@@ -20,7 +20,7 @@ After the containerization refactor the host layer is:
 
 A data VM installs no database server and no web server. The Caddy apt repository and its signing key are no longer configured at all.
 
-The remaining host packages are `gzip`, `tar` and `util-linux` for backups and locking, plus `ca-certificates`, `curl` and `gnupg` for repository setup.
+The remaining host packages are `gzip`, `tar` and `util-linux` for backups and locking, plus `ca-certificates`, `curl` and `gnupg` for repository setup. Data VMs also install `idn2` and `psl` to validate internationalized WordPress hostnames and identify apex domains.
 
 ## Why GlusterFS and garbd stay on the host
 

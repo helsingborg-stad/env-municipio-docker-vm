@@ -86,8 +86,9 @@ validate_config() {
             die "MUNICIPIO_IMAGE must use the approved repository and an exact sha256 digest"
         require_digest MARIADB_IMAGE
         require_digest CADDY_IMAGE
-        [[ "$SITE_ADDRESS" =~ ^[A-Za-z0-9.:-]+$ ]] || die "SITE_ADDRESS contains unsupported characters"
-        [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" =~ ^[A-Za-z0-9.:-]+$ ]] || die "CADDY_SITE_ADDRESS contains unsupported characters"
+        [[ "$SITE_ADDRESS" =~ ^[^[:space:]/:@#?{},]+$ ]] || die "SITE_ADDRESS must be a hostname without scheme, port or path"
+        [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == :80 || "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == "$SITE_ADDRESS" ]] || \
+            die "CADDY_SITE_ADDRESS must be :80 or match SITE_ADDRESS (WordPress controls the host list)"
     fi
     if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
         required GLUSTER_BRICK

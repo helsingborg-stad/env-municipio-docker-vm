@@ -58,6 +58,7 @@ case "$action" in
         fi
         deploy_application
         wait_for_application
+        /scripts/refresh-sites.municipio.sh
         /scripts/maintenance.municipio.sh off
         log 'Bootstrapped. Once the secondary has joined, run: clear-bootstrap-flag'
         ;;
@@ -94,6 +95,7 @@ case "$action" in
             compose pull municipio
             deploy_application
             wait_for_application
+            /scripts/refresh-sites.municipio.sh
             /scripts/maintenance.municipio.sh off
         fi
         log 'Joined. On the primary VM, run: clear-bootstrap-flag'
@@ -125,6 +127,7 @@ case "$action" in
         docker node update --label-add municipio.data=true "$node_id"
         deploy_application
         wait_for_application
+        /scripts/refresh-sites.municipio.sh
         ;;
     status) /scripts/status.municipio.sh ;;
     restore-quorum)

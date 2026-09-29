@@ -139,3 +139,7 @@ sudo /scripts/backup.municipio.sh manual
 The archive records all three image references in `image.txt`, so a restore can reproduce the exact application, database and proxy versions.
 
 Local backups alone do not protect against VM or storage loss. Copy them to an independent backup target and regularly test restoration.
+
+## Add or change a WordPress hostname
+
+Use the [site discovery guide](site-discovery.md). Change WordPress data and DNS/TLS separately; then run `sudo /scripts/refresh-sites.municipio.sh` on each data VM. The timer also polls for changes every minute. Check the generated host list and verify both nodes before sending round-robin traffic.

@@ -1,0 +1,7 @@
+[Unit]
+Description=Refresh Municipio Caddy hostnames from WordPress
+After=docker.service caddy.service
+
+[Service]
+Type=oneshot
+ExecStart=/scripts/refresh-sites.municipio.sh

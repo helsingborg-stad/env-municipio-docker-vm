@@ -20,6 +20,8 @@ Provide simple local commands for maintenance after the interactive installation
 
 Scripts serialize application updates with `flock`. Cluster creation is never part of unattended installation.
 
+The arbitrator installs only `status`, `monitor`, and `cluster`; it has no application or database container to maintain.
+
 ## Talking to a containerized database
 
 No `mariadb` client is installed on the host. Every database command runs inside the database container through two helpers in `scripts/lib/common.sh`:

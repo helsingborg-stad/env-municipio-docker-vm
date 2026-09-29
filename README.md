@@ -23,7 +23,7 @@ The design deliberately has no database load balancer, shared database endpoint,
 - Municipio runs from an immutable, digest-pinned Docker image.
 - MariaDB runs as a container. The application connects only to its own VM through a shared Unix socket.
 - Galera synchronizes databases in cluster modes.
-- GlusterFS synchronizes uploads and cache directories in cluster modes. It stays on the host, because it is a kernel/FUSE storage layer rather than an application service.
+- GlusterFS synchronizes uploads, cache, and Caddy certificate data in cluster modes. It stays on the host, because it is a kernel/FUSE storage layer rather than an application service.
 - A health timer publishes `/healthz` only while the complete local node is usable. It stays on the host, because its cluster checks read the host's mount table.
 - Maintenance commands are installed in `/scripts`.
 - `DOCKER_SWARM=1` runs one coordinated Swarm service across the data VMs, with one local application task per VM. Swarm manages the application only.

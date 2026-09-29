@@ -20,6 +20,17 @@ fi
 
 if docker compose version >/dev/null 2>&1; then
     docker compose --env-file .env.example -f compose.yaml config >/dev/null
+    # Caddy must not restart before Gluster mounts, and its /data must come from
+    # the same DATA_ROOT that Gluster replicates in cluster mode.
+    docker compose --env-file .env.example -f compose.yaml config --format json | python3 -c '
+import json, sys
+config = json.load(sys.stdin)
+caddy = config["services"]["caddy"]
+assert caddy["restart"] == "no"
+assert any(mount["target"] == "/data" and mount["source"] == "/srv/municipio/data/caddy"
+           for mount in caddy["volumes"])
+assert "caddy_data" not in config.get("volumes", {})
+'
     # The Galera bootstrap overlay must merge onto the same project.
     docker compose --env-file .env.example \
         -f compose.yaml -f compose.galera-bootstrap.yaml config | grep -q -- '--wsrep-new-cluster'
@@ -103,6 +114,14 @@ if docker compose version >/dev/null 2>&1; then
     MUNICIPIO_ENV_FILE="$wizard_env" bash -c 'source scripts/lib/common.sh; load_config' >/dev/null
     rm -f "$wizard_env"
 fi
+
+# Caddy's boot unit must wait for its data mount, while cluster activation creates
+# the directory only after Gluster has mounted it.
+grep -Fq 'RequiresMountsFor="@CADDY_DATA_ROOT@"' systemd/municipio-caddy.service.in
+grep -Fq 'systemctl enable municipio-caddy.service' scripts/install/maintenance.sh
+grep -Fq 'tar -C "$DATA_ROOT" -czf "$target/files.tar.gz" uploads cache caddy' scripts/backup.municipio.sh
+grep -Fq 'install -d -m 0700 "$DATA_ROOT/caddy"' scripts/cluster.municipio.sh
+grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 
 # No component may reintroduce a host-installed database or web server.
 if grep -nE 'apt-get install[^|]*\b(mariadb-server|mariadb-client|mariadb-backup|caddy)\b' \

@@ -34,7 +34,7 @@ The refresh validates a candidate Caddyfile before installing it and reloads Cad
 
 When `CADDY_SITE_ADDRESS=:80`, each generated address has an explicit `http://` prefix, for upstream TLS termination. Otherwise Caddy manages HTTPS for each hostname. Public DNS, TLS validation, and the upstream HTTP load balancer must be ready for every hostname before traffic can work. The load balancer must preserve `Host`; `/healthz` checks should use a registered hostname.
 
-In a two-node cluster, refresh runs on each VM against its own local container. After editing sites, run the refresh on both nodes and compare generated files before relying on round-robin routing. The periodic timer converges them, but it is not an atomic cross-node deployment mechanism.
+In a two-node cluster, refresh runs on each VM against its own local container. Caddy certificate and challenge data is shared on Gluster, but the generated host list remains local to each VM. After editing sites, run the refresh on both nodes and compare generated files before relying on round-robin routing. The periodic timer converges them, but it is not an atomic cross-node deployment mechanism.
 
 ## Changing a site's domain
 

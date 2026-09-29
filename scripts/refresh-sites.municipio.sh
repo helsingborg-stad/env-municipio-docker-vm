@@ -11,6 +11,24 @@ load_config
 exec 9>/run/lock/municipio-sites.lock
 flock -n 9 || die 'Another site refresh is running'
 
+# A bind mount opened before Gluster is mounted remains attached to the underlying
+# local directory. Never start or refresh cluster Caddy until the shared mount is ready.
+if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
+    if ! mountpoint -q "$DATA_ROOT"; then
+        if [[ "${1:-}" == --bootstrap-if-unavailable ]]; then
+            log 'Gluster is not mounted; deferring Caddy until cluster activation'
+            exit 0
+        fi
+        die 'Gluster is not mounted; Caddy storage cannot be refreshed'
+    fi
+    [[ "$(findmnt -no FSTYPE --target "$DATA_ROOT")" == fuse.glusterfs ]] || \
+        die 'DATA_ROOT is not a Gluster mount; Caddy storage cannot be refreshed'
+    findmnt -no OPTIONS --target "$DATA_ROOT" | tr ',' '\n' | grep -qx rw || \
+        die 'Gluster mount is read-only; Caddy storage cannot be refreshed'
+fi
+install -d -m 0700 "$DATA_ROOT/caddy"
+[[ -w "$DATA_ROOT/caddy" ]] || die 'Caddy data directory is not writable'
+
 if [[ "$DOCKER_SWARM" == 1 ]]; then
     container="$(docker ps -q --filter "label=com.docker.swarm.service.name=$(swarm_service_name)" --filter status=running | head -n 1)"
 else
@@ -68,6 +86,10 @@ else
     proxy_block="reverse_proxy ${APP_BIND_ADDRESS:-127.0.0.1}:${APP_BIND_PORT:-8080}"
 fi
 cat > "$staging/Caddyfile" <<EOF_CADDY
+{
+    storage file_system /data/caddy
+}
+
 (municipio_proxy) {
     handle /healthz {
         root * /var/lib/municipio/health
@@ -85,9 +107,21 @@ docker image inspect "$CADDY_IMAGE" >/dev/null 2>&1 || docker pull -q "$CADDY_IM
 docker run --rm -v "$staging:/etc/caddy:ro" "$CADDY_IMAGE" \
     caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
+# Older installations kept /data in a node-local named volume. Require an
+# explicit, one-time migration from one node before switching storage.
+if [[ ! -f "$DATA_ROOT/caddy/.legacy-data-migrated" ]] && \
+    docker volume inspect municipio_caddy_data >/dev/null 2>&1 && \
+    docker run --rm --entrypoint sh -v municipio_caddy_data:/old:ro "$CADDY_IMAGE" \
+        -c '[ -n "$(ls -A /old)" ]'; then
+    [[ -f "$DATA_ROOT/caddy/.legacy-data-migrated" ]] || \
+        die 'Existing local Caddy data must be migrated into DATA_ROOT/caddy before switching to shared storage; see docs/components/proxy-health.md'
+fi
+
 if cmp -s "$staging/Caddyfile" "$main_file" && \
     cmp -s "$staging/municipio-sites.caddy" "$sites_file"; then
-    container_running caddy || start_proxy
+    # Compose also applies a changed image or mount definition when the generated
+    # Caddyfile itself has not changed.
+    start_proxy
     exit 0
 fi
 
@@ -95,16 +129,12 @@ fi
 [[ ! -f "$sites_file" ]] || cp -p "$sites_file" "$previous/municipio-sites.caddy"
 install -m 0644 "$staging/municipio-sites.caddy" "$sites_file"
 install -m 0644 "$staging/Caddyfile" "$main_file"
-if container_running caddy; then
-    activated=false
-    if compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
-        activated=true
-    fi
-else
-    activated=false
-    if start_proxy; then
-        activated=true
-    fi
+# Compose recreates an existing Caddy container when its /data mount changes from
+# the old named volume to the Gluster-backed bind mount. A reload alone cannot do that.
+activated=false
+if start_proxy && compose exec -T caddy caddy reload \
+    --config /etc/caddy/Caddyfile --adapter caddyfile; then
+    activated=true
 fi
 if [[ "$activated" == false ]]; then
     for name in Caddyfile municipio-sites.caddy; do

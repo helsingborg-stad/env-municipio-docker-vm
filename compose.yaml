@@ -37,14 +37,18 @@ services:
   caddy:
     image: ${CADDY_IMAGE:?CADDY_IMAGE is required}
     container_name: municipio-caddy
-    restart: unless-stopped
+    # systemd starts Caddy only after the Gluster mount is ready. Docker must not
+    # auto-start it first against an unmounted local directory.
+    restart: "no"
     network_mode: host
     volumes:
       # The directory is mounted, not the file: an in-place config replacement swaps the
       # inode and would detach a single-file bind mount.
       - "${CONFIG_ROOT:-/etc/municipio}/caddy:/etc/caddy:ro"
       - "${HEALTH_ROOT}:/var/lib/municipio/health:ro"
-      - "caddy_data:/data"
+      # In cluster mode DATA_ROOT is the local Gluster mount, so every Caddy
+      # instance sees the same certificates, ACME accounts, locks and challenges.
+      - "${DATA_ROOT}/caddy:/data"
       - "caddy_config:/config"
     healthcheck:
       test: ["CMD", "caddy", "version"]
@@ -85,5 +89,4 @@ services:
       start_period: 60s
 
 volumes:
-  caddy_data:
   caddy_config:

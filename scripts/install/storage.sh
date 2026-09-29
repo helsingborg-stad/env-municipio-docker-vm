@@ -16,6 +16,7 @@ install -d -o "$DB_SOCKET_UID" -g "$DB_SOCKET_GID" -m 0755 "$DB_SOCKET_DIR"
 
 if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
     install -d -o 1000 -g 1000 -m 0755 "${DATA_ROOT}/uploads" "${DATA_ROOT}/cache"
+    install -d -m 0700 "${DATA_ROOT}/caddy"
 else
     install -d -m 0750 "${GLUSTER_BRICK}" "${DATA_ROOT}"
     systemctl enable --now glusterd

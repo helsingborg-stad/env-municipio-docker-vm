@@ -1,6 +1,6 @@
 [Unit]
 Description=Refresh Municipio Caddy hostnames from WordPress
-After=docker.service caddy.service
+After=docker.service municipio-caddy.service
 
 [Service]
 Type=oneshot

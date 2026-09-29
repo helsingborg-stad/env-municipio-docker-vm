@@ -2,17 +2,17 @@
 
 ## Goal
 
-Keep uploads and requested cache directories available locally on every data VM without a central file server.
+Keep uploads, requested cache directories, and Caddy certificate storage available locally on every data VM without a central file server.
 
 ## Standalone solution
 
-The installer creates `/srv/municipio/data/uploads` and `/srv/municipio/data/cache` on the VM's existing filesystem.
+The installer creates `/srv/municipio/data/uploads`, `/srv/municipio/data/cache`, and `/srv/municipio/data/caddy` on the VM's existing filesystem. Caddy mounts the last directory at `/data` for certificates and ACME state.
 
 Docker bind-mounts them into the container. “Mount” here does not mean an external storage service.
 
 ## Cluster solution
 
-Each VM stores a Gluster brick under `/srv/municipio/gluster-brick`. The replicated volume is mounted locally at `/srv/municipio/data`; Docker sees the same bind-mount paths as in standalone mode.
+Each VM stores a Gluster brick under `/srv/municipio/gluster-brick`. The replicated volume is mounted locally at `/srv/municipio/data`; Docker sees the same bind-mount paths as in standalone mode. `DATA_ROOT/caddy` is therefore shared by the Caddy containers on both data VMs. Caddy is started only after Gluster is mounted read/write; it never binds the hidden local directory beneath an absent mount.
 
 With two bricks and no arbitrator, automatic writable failover cannot be made safe in both directions. The first brick is preferred and promotion of the other side is manual. With an optional third Gluster arbiter, the third host stores metadata but not file contents and can provide safe quorum.
 

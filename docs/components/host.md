@@ -17,6 +17,7 @@ After the containerization refactor the host layer is:
 | Replicated files (cluster only) | `glusterfs-server`/`glusterfs-client` packages |
 | Galera arbitrator (arbiter host only) | `galera-arbitrator-4` package |
 | Health evaluation | `municipio-health.timer` systemd timer |
+| Caddy boot ordering | `municipio-caddy.service` systemd unit, after the data mount |
 
 A data VM installs no database server and no web server. The Caddy apt repository and its signing key are no longer configured at all.
 

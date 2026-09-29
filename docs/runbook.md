@@ -6,7 +6,7 @@
 - Point DNS at the VM for standalone, or at the HTTP load balancer for a cluster.
 - Permit ports 80/443 as appropriate.
 - Between cluster hosts permit MariaDB/Galera and Gluster traffic, but never expose it publicly.
-- When an upstream load balancer terminates TLS, set `CADDY_SITE_ADDRESS=:80`, preserve the public Host header, and send `X-Forwarded-Proto: https`.
+- For Caddy-managed TLS on both data VMs, route ports 80 and 443 to either healthy node; Caddy shares its certificates and ACME challenge state through Gluster. When an upstream load balancer terminates TLS, set `CADDY_SITE_ADDRESS=:80`, preserve the public Host header, and send `X-Forwarded-Proto: https`.
 - Automatic package installation configures the official Docker repository for the detected distribution and codename. No database or web server package is installed: MariaDB and Caddy are digest-pinned container images. If conflicting Docker packages are already installed, remove or migrate them deliberately before running the installer. Alternatively set `INSTALL_PACKAGES=false` and preinstall all dependencies.
 - The VM needs outbound access to the container registries for the application, MariaDB and Caddy images.
 
@@ -43,7 +43,7 @@ There is no in-place conversion from the previous host-installed layout. Migrate
    DB_ROOT_PASSWORD="$(sudo sed -n "s/^DB_ROOT_PASSWORD='\(.*\)'$/\1/p" /etc/municipio/municipio.env)"
    zcat database.sql.gz | sudo docker exec -i -e MYSQL_PWD="$DB_ROOT_PASSWORD" \
      municipio-db mariadb -uroot municipio
-   sudo tar -C /srv/municipio/data -xzf files.tar.gz
+   sudo tar -C /srv/municipio/data -xzf files.tar.gz  # includes Caddy certificate data
    sudo /scripts/maintenance.municipio.sh off
    ```
    Use the database name from `DB_NAME` if it is not the default.
@@ -114,6 +114,8 @@ sudo /scripts/update.municipio.sh \
 
 With Compose, update one node at a time. With Swarm, run the command **once on the manager**; the global service rolls tasks across both data VMs. Application updates never recreate the database container. After every node runs the same digest, drain both nodes briefly and run `cluster.municipio.sh clear-cache --all-nodes-drained` once before returning them to service.
 
+Existing installations with a node-local Caddy volume must [migrate it to Gluster](components/proxy-health.md#migrating-existing-caddy-volumes) before enabling shared TLS storage.
+
 ## Update the MariaDB or Caddy image
 
 Deliberately not automated, and deliberately not part of an application update.
@@ -121,11 +123,12 @@ Deliberately not automated, and deliberately not part of an application update.
 1. Take a backup and copy it off the VM.
 2. Put the node into maintenance: `sudo /scripts/maintenance.municipio.sh on`.
 3. Edit `MARIADB_IMAGE` or `CADDY_IMAGE` in `/etc/municipio/municipio.env` (single-quoted, digest-pinned).
-4. Recreate only that service:
+4. For `MARIADB_IMAGE`, recreate only the database container:
    ```bash
    sudo docker compose --env-file /etc/municipio/municipio.env \
      -f /opt/municipio/compose.yaml up -d --no-deps --force-recreate db
    ```
+   For `CADDY_IMAGE`, run `sudo /scripts/refresh-sites.municipio.sh` instead. It checks the Gluster mount before Compose recreates Caddy.
 5. Return to service: `sudo /scripts/maintenance.municipio.sh off`.
 
 A MariaDB major-version change across a Galera cluster is a rolling-upgrade procedure, not a digest swap. Plan it separately.
@@ -136,7 +139,7 @@ A MariaDB major-version change across a Galera cluster is a rolling-upgrade proc
 sudo /scripts/backup.municipio.sh manual
 ```
 
-The archive records all three image references in `image.txt`, so a restore can reproduce the exact application, database and proxy versions.
+The archive includes uploads, cache, and Caddy certificate data. It records all three image references in `image.txt`, so a restore can reproduce the exact application, database and proxy versions. Protect backups as they contain TLS private keys.
 
 Local backups alone do not protect against VM or storage loss. Copy them to an independent backup target and regularly test restoration.
 

@@ -20,6 +20,17 @@ fi
 
 if docker compose version >/dev/null 2>&1; then
     docker compose --env-file .env.example -f compose.yaml config >/dev/null
+    # Caddy must not restart before Gluster mounts, and its /data must come from
+    # the same DATA_ROOT that Gluster replicates in cluster mode.
+    docker compose --env-file .env.example -f compose.yaml config --format json | python3 -c '
+import json, sys
+config = json.load(sys.stdin)
+caddy = config["services"]["caddy"]
+assert caddy["restart"] == "no"
+assert any(mount["target"] == "/data" and mount["source"] == "/srv/municipio/data/caddy"
+           for mount in caddy["volumes"])
+assert "caddy_data" not in config.get("volumes", {})
+'
     # The Galera bootstrap overlay must merge onto the same project.
     docker compose --env-file .env.example \
         -f compose.yaml -f compose.galera-bootstrap.yaml config | grep -q -- '--wsrep-new-cluster'
@@ -104,6 +115,14 @@ if docker compose version >/dev/null 2>&1; then
     rm -f "$wizard_env"
 fi
 
+# Caddy's boot unit must wait for its data mount, while cluster activation creates
+# the directory only after Gluster has mounted it.
+grep -Fq 'RequiresMountsFor="@CADDY_DATA_ROOT@"' systemd/municipio-caddy.service.in
+grep -Fq 'systemctl enable municipio-caddy.service' scripts/install/maintenance.sh
+grep -Fq 'tar -C "$DATA_ROOT" -czf "$target/files.tar.gz" uploads cache caddy' scripts/backup.municipio.sh
+grep -Fq 'install -d -m 0700 "$DATA_ROOT/caddy"' scripts/cluster.municipio.sh
+grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
+
 # No component may reintroduce a host-installed database or web server.
 if grep -nE 'apt-get install[^|]*\b(mariadb-server|mariadb-client|mariadb-backup|caddy)\b' \
     scripts/install/*.sh; then
@@ -118,6 +137,55 @@ fi
 
 MUNICIPIO_ENV_FILE="$ROOT_DIR/.env.example" bash -c \
     'source scripts/lib/common.sh; load_config; [[ "$DEPLOYMENT_MODE" == standalone ]]'
+
+grep -Fq 'packages+=(idn2 psl)' scripts/install/host.sh || {
+    echo 'ERROR: host installer must auto-install idn2 and psl on data VMs' >&2
+    exit 1
+}
+
+if command -v psl >/dev/null 2>&1; then
+    if ! command -v idn2 >/dev/null 2>&1 || ! idn2 --version >/dev/null 2>&1; then
+        # This macOS test host has an incompatible idn2 binary; Linux uses the real command.
+        idn2() {
+            local value="${*: -1}"
+            case "$value" in
+                bücher.se) printf 'xn--bcher-kva.se\n' ;;
+                *) printf '%s\n' "$value" ;;
+            esac
+        }
+        export -f idn2
+    fi
+    site_list="$(printf 'example.co.uk\nblog.example.co.uk\nbücher.se\n' | \
+        bash scripts/lib/build-caddy-sites.sh --http-only)"
+    [[ "$site_list" == *'http://www.example.co.uk {'* ]]
+    [[ "$site_list" == *'http://www.xn--bcher-kva.se {'* ]]
+    [[ "$site_list" != *'www.blog.example.co.uk'* ]]
+    # The installer hostname must appear in WordPress's own list. An alias generated
+    # for an apex domain does not count as a registered WordPress site.
+    printf 'example.co.uk\nblog.example.co.uk\n' | \
+        bash scripts/lib/build-caddy-sites.sh --require-host example.co.uk >/dev/null
+    if printf 'example.co.uk\n' | \
+        bash scripts/lib/build-caddy-sites.sh --require-host www.example.co.uk >/dev/null 2>&1; then
+        echo 'ERROR: generated www alias satisfied the required WordPress hostname' >&2
+        exit 1
+    fi
+    if printf 'other.example.co.uk\n' | \
+        bash scripts/lib/build-caddy-sites.sh --require-host example.co.uk >/dev/null 2>&1; then
+        echo 'ERROR: missing setup hostname passed WordPress discovery' >&2
+        exit 1
+    fi
+    [[ "$(psl --print-reg-domain example.co.uk)" == 'example.co.uk: example.co.uk' ]]
+    [[ "$(psl --print-reg-domain blog.example.co.uk)" == 'blog.example.co.uk: example.co.uk' ]]
+    for invalid in 'https://example.com:444' 'foo.com {' '127.0.0.1' 'foo.com/bar'; do
+        if printf '%s\n' "$invalid" | bash scripts/lib/build-caddy-sites.sh >/dev/null 2>&1; then
+            echo "ERROR: accepted invalid hostname: $invalid" >&2
+            exit 1
+        fi
+    done
+    if declare -F idn2 >/dev/null; then unset -f idn2; fi
+else
+    echo 'SKIP: psl is not installed; Caddy host generation tests need psl'
+fi
 
 source scripts/lib/platform.sh
 for release in 'ubuntu 22.04 jammy' 'ubuntu 24.04 noble' 'ubuntu 26.04 resolute' \

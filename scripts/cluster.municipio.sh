@@ -11,7 +11,12 @@ mount_volume() {
     grep -qE "^[^#]+[[:space:]]+${DATA_ROOT//\//\\/}[[:space:]]" /etc/fstab || \
         echo "localhost:/municipio ${DATA_ROOT} glusterfs defaults,_netdev,backupvolfile-server=${SECONDARY_NODE_ADDRESS} 0 0" >> /etc/fstab
     mountpoint -q "$DATA_ROOT" || mount "$DATA_ROOT"
+    [[ "$(findmnt -no FSTYPE --target "$DATA_ROOT")" == fuse.glusterfs ]] || \
+        die "DATA_ROOT is not a Gluster mount: $DATA_ROOT"
+    findmnt -no OPTIONS --target "$DATA_ROOT" | tr ',' '\n' | grep -qx rw || \
+        die "DATA_ROOT is read-only: $DATA_ROOT"
     install -d -o 1000 -g 1000 -m 0755 "$DATA_ROOT/uploads" "$DATA_ROOT/cache"
+    install -d -m 0700 "$DATA_ROOT/caddy"
 }
 
 case "$action" in
@@ -58,6 +63,7 @@ case "$action" in
         fi
         deploy_application
         wait_for_application
+        /scripts/refresh-sites.municipio.sh
         /scripts/maintenance.municipio.sh off
         log 'Bootstrapped. Once the secondary has joined, run: clear-bootstrap-flag'
         ;;
@@ -89,11 +95,13 @@ case "$action" in
             [[ ! -t 0 ]] || printf '\n' >&2
             [[ -n "$join_token" ]] || die 'Missing Swarm worker join token'
             docker swarm join --token "$join_token" --advertise-addr "$NODE_ADDRESS" "$PRIMARY_NODE_ADDRESS:2377"
-            log 'Worker joined. Run enable-node on the manager after verifying local state.'
+            /scripts/refresh-sites.municipio.sh --bootstrap-if-unavailable
+            log 'Worker joined. Run enable-node on the manager after verifying local state, then refresh sites on this worker.'
         else
             compose pull municipio
             deploy_application
             wait_for_application
+            /scripts/refresh-sites.municipio.sh
             /scripts/maintenance.municipio.sh off
         fi
         log 'Joined. On the primary VM, run: clear-bootstrap-flag'
@@ -125,6 +133,7 @@ case "$action" in
         docker node update --label-add municipio.data=true "$node_id"
         deploy_application
         wait_for_application
+        /scripts/refresh-sites.municipio.sh
         ;;
     status) /scripts/status.municipio.sh ;;
     restore-quorum)

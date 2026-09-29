@@ -1,0 +1,14 @@
+[Unit]
+Description=Start Municipio Caddy after its data mount is ready
+Requires=docker.service
+After=docker.service remote-fs.target
+RequiresMountsFor="@CADDY_DATA_ROOT@"
+
+[Service]
+Type=oneshot
+Restart=on-failure
+RestartSec=10s
+ExecStart=/scripts/refresh-sites.municipio.sh --bootstrap-if-unavailable
+
+[Install]
+WantedBy=multi-user.target

@@ -15,11 +15,14 @@ The wizard runs on the VM, shows numbered choices, and suggests an answer in `[b
 
 Finally it asks whether to change advanced settings (Enter for *no*), shows a summary, and installs. The server name and address are detected automatically. Under advanced settings you can choose Docker Swarm, the administrator user name, the database name and user, and type your own database passwords.
 
-When it finishes, the application, MariaDB and Caddy containers and the health timer are started and enabled for reboot. Nothing but Docker was installed as a package. Open the site hostname in a browser. Check the server with:
+When it finishes, the application, MariaDB and Caddy containers and the health timer are started and enabled for reboot. Docker and small host utilities were installed as packages. Open the site hostname in a browser. Check the server with:
 
 ```bash
 sudo /scripts/status.municipio.sh
+sudo /scripts/refresh-sites.municipio.sh
 ```
+
+The refresh command registers WordPress site hostnames with Caddy and runs automatically every minute. See [WordPress site discovery](site-discovery.md).
 
 If setup stops after saving the configuration, run `sudo sh installer.sh` again and choose **yes** to resume. The installer first checks that the saved settings are complete. Settings written by an older installer version cannot be resumed; it says so and stops without changing anything, and the server should then be reinstalled from scratch. A missing Docker socket usually means the Engine service did not start; check `sudo systemctl status docker.service` and `sudo journalctl -u docker.service` if the retry cannot start it.
 

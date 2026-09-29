@@ -36,6 +36,7 @@ EOF
     fi
 
     packages=(gzip tar util-linux)
+    [[ "$NODE_ROLE" == data ]] && packages+=(idn2 psl)
     if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
         # GlusterFS is a kernel/FUSE storage layer rather than an application service,
         # so it stays on the host. See docs/components/storage.md.
@@ -67,6 +68,8 @@ if [[ "$NODE_ROLE" == data ]]; then
     done
     [[ "$docker_ready" == true ]] || die 'Docker daemon is unavailable; inspect systemctl status docker.service and journalctl -u docker.service'
     docker compose version >/dev/null 2>&1 || die 'Docker Compose plugin is required'
+    command -v idn2 >/dev/null 2>&1 || die 'idn2 is required for WordPress hostname discovery'
+    command -v psl >/dev/null 2>&1 || die 'psl is required for apex-domain detection'
 fi
 
 install -d -m 0750 "$CONFIG_ROOT" "${INSTALL_ROOT:-/opt/municipio}" "${BACKUP_ROOT:-/var/backups/municipio}"

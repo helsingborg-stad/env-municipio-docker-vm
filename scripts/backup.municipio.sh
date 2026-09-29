@@ -9,7 +9,7 @@ stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 target="${BACKUP_ROOT}/${stamp}-${label}"
 install -d -m 0700 "$target"
 db_root mariadb-dump -uroot --single-transaction --routines --events "$DB_NAME" | gzip -c > "$target/database.sql.gz"
-tar -C "$DATA_ROOT" -czf "$target/files.tar.gz" uploads cache
+tar -C "$DATA_ROOT" -czf "$target/files.tar.gz" uploads cache caddy
 install -m 0600 "$MUNICIPIO_ENV_FILE" "$target/municipio.env"
 # Record every image the restore has to reproduce, not just the application.
 {

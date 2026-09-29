@@ -348,7 +348,7 @@ if [[ "$node_role" == data ]]; then
         # People paste what their browser shows; keep only the host name.
         site_address="${REPLY#http://}" site_address="${site_address#https://}"
         site_address="${site_address%%/*}"
-        [[ "$site_address" =~ $ADDRESS_PATTERN ]] && break
+        [[ "$site_address" =~ ^[^[:space:]/:@#?{},]+$ ]] && break
         say 'Enter only the address, such as www.example.se (no spaces).'
     done
     menu 'Who takes care of the HTTPS certificate (the padlock in the browser)?' caddy \

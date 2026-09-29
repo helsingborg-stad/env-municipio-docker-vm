@@ -21,7 +21,7 @@ The host layer is:
 
 A data VM installs no database server and no web server. It does not configure a Caddy apt repository.
 
-The remaining host packages are `gzip`, `tar` and `util-linux` for backups and locking, plus `ca-certificates`, `curl` and `gnupg` for repository setup. Data VMs also install `idn2` and `psl` to validate internationalized WordPress hostnames and identify apex domains.
+The remaining host packages are `gzip`, `tar` and `util-linux` for backups and locking, plus `ca-certificates`, `curl` and `gnupg` for repository setup. Data VMs also install `idn2` and `psl` for WordPress hostname checks, and `openssl` for certificate expiry checks.
 
 ## Why GlusterFS and garbd stay on the host
 

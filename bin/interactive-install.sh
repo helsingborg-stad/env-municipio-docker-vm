@@ -112,14 +112,14 @@ secret() {
     done
 }
 
-random_secret() { openssl rand -hex 24; }
+random_secret() { od -An -N24 -tx1 /dev/urandom | tr -d ' \n'; }
 
 # Both data servers of a cluster must hold identical database passwords, because the
 # database copies its user accounts from one server to the other. Deriving them from one
 # shared cluster password lets the operator type a single secret on each server, in any
 # order. The output is hex, so it can never contain a single quote.
 derive_secret() {
-    printf 'municipio:%s:%s' "$1" "$2" | openssl dgst -sha256 -r | cut -c1-48
+    printf 'municipio:%s:%s' "$1" "$2" | sha256sum | cut -c1-48
 }
 
 # The generated file is read twice with different parsers: bash `source` in the
@@ -261,9 +261,6 @@ if [[ -e /etc/municipio/municipio.env ]]; then
 fi
 
 detect_platform
-command -v openssl >/dev/null 2>&1 || {
-    echo 'The openssl program is required to create passwords. Install it with: sudo apt-get install openssl' >&2; exit 1;
-}
 
 printf 'Welcome to the Municipio installer (%s %s).\n' "$PLATFORM_ID" "$PLATFORM_VERSION" >&2
 say 'You will be asked a few questions. The suggested answer is shown in [brackets];'

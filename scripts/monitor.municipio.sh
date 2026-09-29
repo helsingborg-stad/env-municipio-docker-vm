@@ -124,11 +124,16 @@ behind_lb() { [[ "${CADDY_SITE_ADDRESS:-${SITE_ADDRESS:-}}" == :80 || -z "$(site
 
 # HTTP status of /healthz as served by the Caddy on ADDRESS. With automatic TLS Caddy
 # redirects plain HTTP, so the request goes to 443 with the site name pinned to ADDRESS.
-# Prints "CODE" or "CODE untrusted" when the certificate does not verify.
+# Prints "CODE", "CODE untrusted" when the certificate does not verify, or, when there
+# is no HTTP answer at all, "000 REASON": "notls" (TLS handshake refused, which is what
+# Caddy does while it has no certificate), "closed" or "timeout".
 healthz_via_caddy() {
-    local address="$1" code
+    local address="$1" code rc
     if behind_lb; then
-        curl -s -o /dev/null -m 5 -w '%{http_code}' "http://${address}/healthz" 2>/dev/null
+        code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://${address}/healthz" 2>/dev/null)"
+        rc=$?
+        [[ "$code" != 000 ]] || code="000 $(curl_reason "$rc")"
+        printf '%s' "$code"
         return
     fi
     local site; site="$(site_host)"
@@ -137,9 +142,44 @@ healthz_via_caddy() {
     if [[ "$code" == 000 ]]; then
         code="$(curl -sk -o /dev/null -m 5 -w '%{http_code}' --resolve "${site}:443:${address}" \
             "https://${site}/healthz" 2>/dev/null)"
-        [[ "$code" == 000 ]] || code="$code untrusted"
+        rc=$?
+        if [[ "$code" == 000 ]]; then
+            code="000 $(curl_reason "$rc")"
+        else
+            code="$code untrusted"
+        fi
     fi
     printf '%s' "$code"
+}
+
+# curl exit codes: 35 TLS handshake failed, 7 connection refused, 28 timed out.
+curl_reason() {
+    case "$1" in 35) echo notls ;; 7) echo closed ;; 28) echo timeout ;; *) echo "curl-$1" ;; esac
+}
+
+# The reason Caddy last gave for failing to obtain a certificate, e.g.
+# "DNS problem: NXDOMAIN looking up A for www.example.se". Empty when none is logged.
+acme_failure() {
+    timeout 5 docker logs --since 48h municipio-caddy 2>&1 \
+        | grep '"could not get certificate' | tail -n 1 \
+        | sed -n 's/.*"error":"\([^"]*\)".*/\1/p' \
+        | sed 's/^[^ ]* [0-9]* [^ ]* - //; s/;.*//; s/ - check .*//'
+}
+
+# Recorded when the local Caddy serves no usable certificate: says why, and what to do.
+record_certificate_problem() {
+    local status="$1" detail="$2" cause hint
+    cause="$(acme_failure)"
+    hint="sudo docker logs municipio-caddy 2>&1 | grep -i 'could not get certificate' | tail -n 3"
+    if [[ "$cause" == *NXDOMAIN* ]]; then
+        hint="Create a DNS record for $(site_host), then: sudo docker restart municipio-caddy"
+    fi
+    if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
+        # One DNS name cannot give both data VMs a certificate of their own.
+        hint="$hint | cluster: TLS on the load balancer, CADDY_SITE_ADDRESS=:80 (docs/components/proxy-health.md)"
+    fi
+    record caddy "$status" 'TLS certificate' "$detail" "$hint"
+    [[ -z "$cause" ]] || record caddy INFO 'ACME error' "$cause"
 }
 
 peer_name() { [[ "$NODE_NAME" == "$PRIMARY_NODE_NAME" ]] && echo "$SECONDARY_NODE_NAME" || echo "$PRIMARY_NODE_NAME"; }
@@ -245,9 +285,10 @@ check_proxy() {
     case "$code" in
         200) record caddy OK 'route /healthz' 'HTTP 200 through Caddy' ;;
         404) record caddy OK 'route /healthz' 'HTTP 404: Caddy answers, marker absent' ;;
-        *untrusted*) record caddy WARN 'TLS certificate' "HTTP ${code% *} only without verification" \
-            'sudo docker logs municipio-caddy 2>&1 | grep -i acme | tail' ;;
-        *) record caddy FAIL 'route /healthz' "HTTP ${code:-000} from local Caddy" 'sudo docker logs --tail 50 municipio-caddy' ;;
+        *untrusted*) record_certificate_problem WARN "not trusted (staging or self-signed?); HTTP ${code% *} without checks" ;;
+        '000 notls') record_certificate_problem FAIL "Caddy has no certificate for $(site_host); HTTPS refused" ;;
+        '000 closed') record caddy FAIL 'route /healthz' 'nothing accepts connections on 80/443' 'sudo docker logs --tail 50 municipio-caddy' ;;
+        *) record caddy FAIL 'route /healthz' "no answer from local Caddy (${code#000 })" 'sudo docker logs --tail 50 municipio-caddy' ;;
     esac
     if ! behind_lb && command -v openssl >/dev/null 2>&1; then
         local end days
@@ -597,7 +638,10 @@ check_peer() {
     case "$code" in
         200*) record peer OK 'peer /healthz' 'HTTP 200' ;;
         404*) record peer FAIL 'peer /healthz' "HTTP 404: $name reports itself unhealthy" "Run this monitor on $name" ;;
-        *) record peer FAIL 'peer /healthz' "HTTP ${code:-000}: $name unreachable on 80/443" "Check $name is up, and the firewall" ;;
+        '000 notls') record peer FAIL 'peer /healthz' "HTTPS refused: $name's Caddy has no certificate" "Run this monitor on $name" ;;
+        '000 closed') record peer FAIL 'peer /healthz' "$name refuses connections on 80/443" "Check municipio-caddy on $name" ;;
+        '000 timeout') record peer FAIL 'peer /healthz' "$name does not answer on 80/443" "Check $name is up, and that the firewall allows 80/443 from $NODE_ADDRESS" ;;
+        *) record peer FAIL 'peer /healthz' "HTTP ${code:-000} from $name" "Run this monitor on $name" ;;
     esac
     if [[ -n "${GALERA_SIZE:-}" ]]; then
         if ((GALERA_SIZE >= GALERA_EXPECTED)); then
@@ -662,7 +706,7 @@ check_arbiter_host() {
         if [[ "$code" == 200* ]]; then
             record "$comp" OK '/healthz' 'HTTP 200'
         else
-            record "$comp" FAIL '/healthz' "HTTP ${code:-000}: unreachable or unhealthy" "Run this monitor on $name"
+            record "$comp" FAIL '/healthz' "no healthy answer (${code:-000})" "Run this monitor on $name"
         fi
         if tcp_open "$address" 4567; then
             record "$comp" OK 'galera port 4567' open

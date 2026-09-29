@@ -36,7 +36,7 @@ EOF
     fi
 
     packages=(gzip tar util-linux)
-    [[ "$NODE_ROLE" == data ]] && packages+=(idn2 psl)
+    [[ "$NODE_ROLE" == data ]] && packages+=(idn2 psl openssl)
     if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
         # GlusterFS is a kernel/FUSE storage layer rather than an application service,
         # so it stays on the host. See docs/components/storage.md.

@@ -51,6 +51,10 @@ validate_config() {
         *) die "DEPLOYMENT_MODE must be standalone, cluster-manual or cluster-arbitrator" ;;
     esac
     case "$NODE_ROLE" in data|arbiter) ;; *) die "NODE_ROLE must be data or arbiter" ;; esac
+    [[ "$NODE_ROLE" != arbiter || "$DEPLOYMENT_MODE" == cluster-arbitrator ]] || \
+        die 'NODE_ROLE=arbiter requires cluster-arbitrator mode'
+    [[ "$NODE_ROLE" != arbiter || "$DOCKER_SWARM" == 0 ]] || \
+        die 'The arbitrator does not run Docker Swarm'
     required NODE_NAME
     required NODE_ADDRESS
     [[ "$NODE_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || die "NODE_NAME contains unsupported characters"
@@ -71,6 +75,10 @@ validate_config() {
         [[ "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || die "DB_USER may contain only letters, digits and underscore"
         [[ "$DB_SOCKET_UID" =~ ^[0-9]+$ && "$DB_SOCKET_GID" =~ ^[0-9]+$ ]] || \
             die "DB_SOCKET_UID and DB_SOCKET_GID must be numeric"
+        [[ "${APP_BIND_ADDRESS:-127.0.0.1}" == 127.0.0.1 ]] || \
+            die 'APP_BIND_ADDRESS must be 127.0.0.1 so the application port stays local'
+        [[ "${APP_BIND_PORT:-8080}" =~ ^[0-9]+$ ]] && ((10#${APP_BIND_PORT:-8080} >= 1 && 10#${APP_BIND_PORT:-8080} <= 65535)) || \
+            die 'APP_BIND_PORT must be a number from 1 to 65535'
         for path_name in DATA_ROOT DB_DATA_ROOT DB_SOCKET_DIR; do
             [[ "${!path_name}" == /* && "${!path_name}" != / ]] || \
                 die "$path_name must be an absolute, non-root path"
@@ -99,12 +107,27 @@ validate_config() {
         for value in "$PRIMARY_NODE_NAME" "$PRIMARY_NODE_ADDRESS" "$SECONDARY_NODE_NAME" "$SECONDARY_NODE_ADDRESS"; do
             [[ "$value" =~ ^[A-Za-z0-9._:-]+$ ]] || die "Cluster node values contain unsupported characters"
         done
+        [[ "$PRIMARY_NODE_NAME" != "$SECONDARY_NODE_NAME" && "$PRIMARY_NODE_ADDRESS" != "$SECONDARY_NODE_ADDRESS" ]] || \
+            die 'The two data nodes need distinct names and addresses'
     fi
     if [[ "$DEPLOYMENT_MODE" == cluster-arbitrator ]]; then
         required ARBITRATOR_NODE_NAME
         required ARBITRATOR_NODE_ADDRESS
         [[ "$ARBITRATOR_NODE_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || die "ARBITRATOR_NODE_NAME contains unsupported characters"
         [[ "$ARBITRATOR_NODE_ADDRESS" =~ ^[A-Za-z0-9.:-]+$ ]] || die "ARBITRATOR_NODE_ADDRESS contains unsupported characters"
+        [[ "$ARBITRATOR_NODE_NAME" != "$PRIMARY_NODE_NAME" && "$ARBITRATOR_NODE_NAME" != "$SECONDARY_NODE_NAME" && \
+            "$ARBITRATOR_NODE_ADDRESS" != "$PRIMARY_NODE_ADDRESS" && "$ARBITRATOR_NODE_ADDRESS" != "$SECONDARY_NODE_ADDRESS" ]] || \
+            die 'The arbitrator needs a distinct name and address'
+    fi
+    if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
+        if [[ "$NODE_ROLE" == arbiter ]]; then
+            [[ "$NODE_NAME" == "$ARBITRATOR_NODE_NAME" && "$NODE_ADDRESS" == "$ARBITRATOR_NODE_ADDRESS" ]] || \
+                die 'This arbitrator must match ARBITRATOR_NODE_NAME and ARBITRATOR_NODE_ADDRESS'
+        else
+            [[ ( "$NODE_NAME" == "$PRIMARY_NODE_NAME" && "$NODE_ADDRESS" == "$PRIMARY_NODE_ADDRESS" ) || \
+               ( "$NODE_NAME" == "$SECONDARY_NODE_NAME" && "$NODE_ADDRESS" == "$SECONDARY_NODE_ADDRESS" ) ]] || \
+                die 'This data node must match the primary or secondary name and address'
+        fi
     fi
 }
 

@@ -41,9 +41,8 @@ case "$action" in
         gluster volume start municipio || true
         mount_volume
         docker pull -q "$MARIADB_IMAGE" >/dev/null
-        # Unlike the one-shot galera_new_cluster helper this replaces, a container keeps
-        # its command across restarts. The marker records that, and status reports it
-        # until clear-bootstrap-flag removes both.
+        # The container keeps its command across restarts. The marker records that,
+        # and status reports it until clear-bootstrap-flag removes both.
         touch "$(galera_bootstrap_marker)"
         compose_galera_bootstrap up -d --no-deps --force-recreate db
         wait_for_database 600 || die 'MariaDB did not form a Galera primary component'
@@ -147,8 +146,8 @@ case "$action" in
     start-arbitrator)
         [[ "$NODE_ROLE" == arbiter ]] || die 'start-arbitrator must run on the arbitrator host'
         [[ "$DEPLOYMENT_MODE" == cluster-arbitrator ]] || die 'Arbitrator requires cluster-arbitrator mode'
-        systemctl enable --now garb
         systemctl enable --now glusterd
+        systemctl enable --now garb
         ;;
     *) echo "Usage: $0 bootstrap | join [--token-stdin] | clear-bootstrap-flag | enable-node HOSTNAME | status | restore-quorum | clear-cache --all-nodes-drained | start-arbitrator" >&2; exit 2 ;;
 esac

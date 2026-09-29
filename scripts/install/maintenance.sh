@@ -4,7 +4,12 @@ source "${MUNICIPIO_REPO_ROOT}/scripts/lib/common.sh"
 load_config
 
 install -d -m 0755 /scripts
-for script in update status monitor maintenance backup health cluster failover swarm-firewall refresh-sites; do
+if [[ "$NODE_ROLE" == arbiter ]]; then
+    scripts=(status monitor cluster)
+else
+    scripts=(update status monitor maintenance backup health cluster failover swarm-firewall refresh-sites)
+fi
+for script in "${scripts[@]}"; do
     install -m 0750 "$MUNICIPIO_REPO_ROOT/scripts/${script}.municipio.sh" "/scripts/${script}.municipio.sh"
 done
 install -d -m 0755 /usr/local/lib/municipio

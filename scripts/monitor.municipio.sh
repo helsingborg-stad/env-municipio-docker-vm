@@ -172,11 +172,7 @@ record_certificate_problem() {
     cause="$(acme_failure)"
     hint="sudo docker logs municipio-caddy 2>&1 | grep -i 'could not get certificate' | tail -n 3"
     if [[ "$cause" == *NXDOMAIN* ]]; then
-        hint="Create a DNS record for $(site_host), then: sudo docker restart municipio-caddy"
-    fi
-    if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
-        # One DNS name cannot give both data VMs a certificate of their own.
-        hint="$hint | cluster: TLS on the load balancer, CADDY_SITE_ADDRESS=:80 (docs/components/proxy-health.md)"
+        hint="Create a DNS record for $(site_host), then: sudo /scripts/refresh-sites.municipio.sh"
     fi
     record caddy "$status" 'TLS certificate' "$detail" "$hint"
     [[ -z "$cause" ]] || record caddy INFO 'ACME error' "$cause"

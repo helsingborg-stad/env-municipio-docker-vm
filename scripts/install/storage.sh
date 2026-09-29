@@ -5,7 +5,6 @@ load_config
 
 if [[ "$NODE_ROLE" == arbiter ]]; then
     install -d -m 0750 "${GLUSTER_BRICK}"
-    systemctl enable --now glusterd
     exit 0
 fi
 
@@ -19,6 +18,5 @@ if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
     install -d -m 0700 "${DATA_ROOT}/caddy"
 else
     install -d -m 0750 "${GLUSTER_BRICK}" "${DATA_ROOT}"
-    systemctl enable --now glusterd
     log "Gluster directories prepared; bootstrap/join is an explicit cluster operation"
 fi

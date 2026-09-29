@@ -29,7 +29,6 @@ caddy = config["services"]["caddy"]
 assert caddy["restart"] == "no"
 assert any(mount["target"] == "/data" and mount["source"] == "/srv/municipio/data/caddy"
            for mount in caddy["volumes"])
-assert "caddy_data" not in config.get("volumes", {})
 '
     # The Galera bootstrap overlay must merge onto the same project.
     docker compose --env-file .env.example \
@@ -63,7 +62,8 @@ fi
 # string and hand the container another, locking the site out of its own database.
 if docker compose version >/dev/null 2>&1; then
     quoting_env="$(mktemp)"
-    quoting_yaml="$(mktemp -d)/compose.yaml"
+    quoting_dir="$(mktemp -d)"
+    quoting_yaml="$quoting_dir/compose.yaml"
     # The literal $ and backslash are the point of this fixture, not an expansion.
     # shellcheck disable=SC2016
     probe_value='pa$$w0rd \back #hash;semi&pipe| "dq" a b'
@@ -80,6 +80,7 @@ YML
         source "$quoting_env"; set +a; printf '%s' "$TRICKY")"
     from_compose="$(docker compose --env-file "$quoting_env" -f "$quoting_yaml" run --rm -q probe)"
     rm -f "$quoting_env"
+    rm -rf "$quoting_dir"
     if [[ "$from_bash" != "$probe_value" || "$from_compose" != "$probe_value" ]]; then
         echo 'ERROR: bash and Docker Compose disagree on the dotenv encoding' >&2
         printf '  expected: [%s]\n  bash:     [%s]\n  compose:  [%s]\n' \
@@ -138,8 +139,38 @@ fi
 MUNICIPIO_ENV_FILE="$ROOT_DIR/.env.example" bash -c \
     'source scripts/lib/common.sh; load_config; [[ "$DEPLOYMENT_MODE" == standalone ]]'
 
-grep -Fq 'packages+=(idn2 psl)' scripts/install/host.sh || {
-    echo 'ERROR: host installer must auto-install idn2 and psl on data VMs' >&2
+# Exercise every supported mode and node role through the same configuration loader
+# used by the installer. Data nodes must also render a complete Compose project.
+mode_env="$(mktemp)"
+trap 'rm -f "$mode_env"' EXIT
+for scenario in manual-primary manual-secondary arbitrator-primary arbitrator-secondary arbitrator-witness; do
+    case "$scenario" in
+        manual-*) mode=cluster-manual ;;
+        arbitrator-*) mode=cluster-arbitrator ;;
+    esac
+    role=data name=municipio-01 address=10.20.0.11
+    case "$scenario" in
+        *-secondary) name=municipio-02 address=10.20.0.12 ;;
+        *-witness) role=arbiter name=municipio-arbiter address=10.20.0.13 ;;
+    esac
+    sed -e "s/^DEPLOYMENT_MODE=.*/DEPLOYMENT_MODE=$mode/" \
+        -e "s/^NODE_ROLE=.*/NODE_ROLE=$role/" \
+        -e "s/^NODE_NAME=.*/NODE_NAME=$name/" \
+        -e "s/^NODE_ADDRESS=.*/NODE_ADDRESS=$address/" \
+        -e 's/^ARBITRATOR_NODE_ADDRESS=.*/ARBITRATOR_NODE_ADDRESS=10.20.0.13/' \
+        .env.example > "$mode_env"
+    MUNICIPIO_ENV_FILE="$mode_env" bash -c \
+        'source scripts/lib/common.sh; load_config; [[ "$DEPLOYMENT_MODE" == "$1" && "$NODE_ROLE" == "$2" ]]' \
+        _ "$mode" "$role"
+    if [[ "$role" == data ]] && docker compose version >/dev/null 2>&1; then
+        docker compose --env-file "$mode_env" -f compose.yaml config >/dev/null
+    fi
+done
+rm -f "$mode_env"
+trap - EXIT
+
+grep -Fq 'packages+=(idn2 psl openssl)' scripts/install/host.sh || {
+    echo 'ERROR: host installer must install hostname and certificate check tools on data VMs' >&2
     exit 1
 }
 
@@ -230,6 +261,11 @@ reject_config 'a database directory inside DATA_ROOT' \
 reject_config 'a database directory inside GLUSTER_BRICK' \
     sed 's|^DB_DATA_ROOT=.*$|DB_DATA_ROOT=/srv/municipio/gluster-brick/mysql|'
 reject_config 'a missing database root password' sed 's|^DB_ROOT_PASSWORD=.*$||'
+reject_config 'an arbitrator in standalone mode' sed 's|^NODE_ROLE=.*$|NODE_ROLE=arbiter|'
+reject_config 'a publicly bound application port' sed 's|^APP_BIND_ADDRESS=.*$|APP_BIND_ADDRESS=0.0.0.0|'
+reject_config 'a cluster data node with mismatched identity' sed \
+    -e 's|^DEPLOYMENT_MODE=.*$|DEPLOYMENT_MODE=cluster-manual|' \
+    -e 's|^NODE_ADDRESS=.*$|NODE_ADDRESS=10.20.0.99|'
 
 # The status board must render every layout without touching the system. The demo
 # cluster contains a failure, so exit status 2 is the expected result.

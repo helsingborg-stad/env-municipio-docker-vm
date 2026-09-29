@@ -90,7 +90,7 @@ Health evaluation stays on the host, because its cluster checks read the host's 
 
 ## Galera bootstrap has explicit state
 
-A container cannot apply `--wsrep-new-cluster` to exactly one start the way the distribution's `galera_new_cluster` helper did. Bootstrapping therefore sets a marker that `status.municipio.sh` keeps reporting, and `cluster.municipio.sh clear-bootstrap-flag` removes it once the peer has joined. See [MariaDB and Galera](components/database.md).
+The `--wsrep-new-cluster` container argument persists across restarts. Bootstrapping therefore sets a marker that `status.municipio.sh` keeps reporting, and `cluster.municipio.sh clear-bootstrap-flag` removes it once the peer has joined. See [MariaDB and Galera](components/database.md).
 
 ## Container execution
 

@@ -1,8 +1,6 @@
 services:
-  # MariaDB shares the host network namespace so that bind-address, the published port
-  # matrix and Galera replication behave exactly as they did with the distribution
-  # package. The application never reaches it over the network: DB_SOCKET_DIR is the
-  # only connection path, mounted read-only into the application container.
+  # MariaDB shares the host network namespace so Galera uses the VM's real address.
+  # The application connects through DB_SOCKET_DIR, mounted read-only into its container.
   db:
     image: ${MARIADB_IMAGE:?MARIADB_IMAGE is required}
     container_name: municipio-db

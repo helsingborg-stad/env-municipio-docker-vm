@@ -86,10 +86,8 @@ validate_config() {
             die "DB_SOCKET_UID and DB_SOCKET_GID must be numeric"
         [[ "${APP_BIND_ADDRESS:-127.0.0.1}" == 127.0.0.1 ]] || \
             die 'APP_BIND_ADDRESS must be 127.0.0.1 so the application port stays local'
-        if ! [[ "${APP_BIND_PORT:-8080}" =~ ^[0-9]+$ ]] || \
-            ! ((10#${APP_BIND_PORT:-8080} >= 1 && 10#${APP_BIND_PORT:-8080} <= 65535)); then
+        [[ "${APP_BIND_PORT:-8080}" =~ ^[0-9]+$ ]] && ((10#${APP_BIND_PORT:-8080} >= 1 && 10#${APP_BIND_PORT:-8080} <= 65535)) || \
             die 'APP_BIND_PORT must be a number from 1 to 65535'
-        fi
         for path_name in DATA_ROOT DB_DATA_ROOT DB_SOCKET_DIR; do
             [[ "${!path_name}" == /* && "${!path_name}" != / ]] || \
                 die "$path_name must be an absolute, non-root path"
@@ -126,14 +124,6 @@ validate_config() {
                 ;;
             *) die 'ACME_DNS_PROVIDER must be none, loopia or namedotcom' ;;
         esac
-        # Caddy substitutes {$VAR} into the Caddyfile text before parsing; the values are
-        # quoted there, so only characters that end or escape a quoted token, or that DNS
-        # modules expand as runtime placeholders, are unsafe.
-        for credential_name in ACME_DNS_LOOPIA_USERNAME ACME_DNS_LOOPIA_PASSWORD \
-            ACME_DNS_NAMEDOTCOM_USER ACME_DNS_NAMEDOTCOM_TOKEN; do
-            [[ "${!credential_name}" != *[\"\\{}$'\n\r']* ]] || \
-                die "$credential_name must not contain double quotes, backslashes, braces or line breaks"
-        done
         [[ -z "$ACME_DNS_CHALLENGE_DOMAIN" || "$ACME_DNS_CHALLENGE_DOMAIN" =~ ^_acme-challenge\.[A-Za-z0-9.-]+$ ]] || \
             die 'ACME_DNS_CHALLENGE_DOMAIN must be a full _acme-challenge hostname'
     fi

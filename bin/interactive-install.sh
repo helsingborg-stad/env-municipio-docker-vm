@@ -101,12 +101,9 @@ yes_no() {
 # OPTIONAL=true lets Enter return an empty value, which the caller replaces.
 # CONFIRM=false skips the second entry, for pasted values rather than new passwords.
 secret() {
-    local label="$1" optional="${2:-false}" min_length="${3:-1}" confirm_entry="${4:-true}" answer confirm optional_hint=
-    if [[ "$optional" == true ]]; then
-        optional_hint=' (press Enter to create one automatically)'
-    fi
+    local label="$1" optional="${2:-false}" min_length="${3:-1}" confirm_entry="${4:-true}" answer confirm
     while true; do
-        printf '%s%s: ' "$label" "$optional_hint" >&2
+        printf '%s%s: ' "$label" "$([[ "$optional" == true ]] && printf ' (press Enter to create one automatically)' || true)" >&2
         IFS= read -r -s -u 3 answer || exit 1
         printf '\n' >&2
         if [[ -z "$answer" ]]; then
@@ -169,17 +166,6 @@ ADDRESS_HINT='Enter an IP address such as 10.20.0.11.'
 EMAIL_PATTERN='^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
 IMAGE_PATTERN='^[A-Za-z0-9._/-]+@sha256:[a-f0-9]{64}$'
 DNS_CHALLENGE_DOMAIN_PATTERN='^_acme-challenge\.[A-Za-z0-9.-]+$'
-DNS_CREDENTIAL_PATTERN='^[^"\\{}]+$'
-DNS_CREDENTIAL_HINT='DNS API credentials cannot contain double quotes, backslashes or braces.'
-
-# dns_secret LABEL. A pasted provider credential that must also satisfy DNS_CREDENTIAL_PATTERN.
-dns_secret() {
-    while true; do
-        secret "$1" false 1 false
-        [[ "$REPLY" =~ $DNS_CREDENTIAL_PATTERN ]] && return
-        say "$DNS_CREDENTIAL_HINT"
-    done
-}
 
 detected_address() {
     local address
@@ -296,7 +282,7 @@ if [[ -e /etc/municipio/municipio.env ]]; then
     exit 0
 fi
 
-detect_platform /etc/os-release "$(dpkg --print-architecture)"
+detect_platform
 
 printf 'Welcome to the Municipio installer (%s %s).\n' "$PLATFORM_ID" "$PLATFORM_VERSION" >&2
 say 'You will be asked a few questions. The suggested answer is shown in [brackets];'
@@ -404,15 +390,15 @@ if [[ "$node_role" == data ]]; then
             acme_dns_challenge_domain="$REPLY"
             case "$acme_dns_provider" in
                 loopia)
-                    ask 'Loopia API user name (usually ending in @loopiaapi)' '' "$DNS_CREDENTIAL_PATTERN" "$DNS_CREDENTIAL_HINT"
+                    ask 'Loopia API user name (usually ending in @loopiaapi)'
                     acme_dns_loopia_username="$REPLY"
-                    dns_secret 'Loopia API password'
+                    secret 'Loopia API password' false 1 false
                     acme_dns_loopia_password="$REPLY"
                     ;;
                 namedotcom)
-                    ask 'name.com API user name' '' "$DNS_CREDENTIAL_PATTERN" "$DNS_CREDENTIAL_HINT"
+                    ask 'name.com API user name'
                     acme_dns_namedotcom_user="$REPLY"
-                    dns_secret 'name.com API token'
+                    secret 'name.com API token' false 1 false
                     acme_dns_namedotcom_token="$REPLY"
                     ;;
             esac

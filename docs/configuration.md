@@ -106,7 +106,7 @@ By default Caddy uses HTTP validation. Set `ACME_DNS_PROVIDER` to `loopia` or `n
 | `loopia` | `ACME_DNS_LOOPIA_USERNAME`, `ACME_DNS_LOOPIA_PASSWORD` | `github.com/caddy-dns/loopia` |
 | `namedotcom` | `ACME_DNS_NAMEDOTCOM_USER`, `ACME_DNS_NAMEDOTCOM_TOKEN` | `github.com/caddy-dns/namedotcom` |
 
-`ACME_DNS_NAMEDOTCOM_SERVER` defaults to `https://api.name.com`. Loopia needs a separate API user (normally ending in `@loopiaapi`), rather than the normal account login. Credentials may contain spaces, but not double quotes, backslashes, braces or line breaks; configuration validation and the installer reject them.
+`ACME_DNS_NAMEDOTCOM_SERVER` defaults to `https://api.name.com`. Loopia needs a separate API user (normally ending in `@loopiaapi`), rather than the normal account login.
 
 Leave `ACME_DNS_CHALLENGE_DOMAIN` empty for ordinary DNS-01: Caddy writes each site's normal `_acme-challenge.<site>` TXT record. To delegate a challenge to another DNS zone, create the CNAME yourself and set this value to its full target. For example, with a CNAME from `_acme-challenge.dns01.example.com` to `_acme-challenge.dns01.example.io` (note the top domain change), use:
 

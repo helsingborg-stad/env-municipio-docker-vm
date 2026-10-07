@@ -169,6 +169,17 @@ ADDRESS_HINT='Enter an IP address such as 10.20.0.11.'
 EMAIL_PATTERN='^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
 IMAGE_PATTERN='^[A-Za-z0-9._/-]+@sha256:[a-f0-9]{64}$'
 DNS_CHALLENGE_DOMAIN_PATTERN='^_acme-challenge\.[A-Za-z0-9.-]+$'
+DNS_CREDENTIAL_PATTERN='^[^"\\{}]+$'
+DNS_CREDENTIAL_HINT='DNS API credentials cannot contain double quotes, backslashes or braces.'
+
+# dns_secret LABEL. A pasted provider credential that must also satisfy DNS_CREDENTIAL_PATTERN.
+dns_secret() {
+    while true; do
+        secret "$1" false 1 false
+        [[ "$REPLY" =~ $DNS_CREDENTIAL_PATTERN ]] && return
+        say "$DNS_CREDENTIAL_HINT"
+    done
+}
 
 detected_address() {
     local address
@@ -393,15 +404,15 @@ if [[ "$node_role" == data ]]; then
             acme_dns_challenge_domain="$REPLY"
             case "$acme_dns_provider" in
                 loopia)
-                    ask 'Loopia API user name (usually ending in @loopiaapi)'
+                    ask 'Loopia API user name (usually ending in @loopiaapi)' '' "$DNS_CREDENTIAL_PATTERN" "$DNS_CREDENTIAL_HINT"
                     acme_dns_loopia_username="$REPLY"
-                    secret 'Loopia API password' false 1 false
+                    dns_secret 'Loopia API password'
                     acme_dns_loopia_password="$REPLY"
                     ;;
                 namedotcom)
-                    ask 'name.com API user name'
+                    ask 'name.com API user name' '' "$DNS_CREDENTIAL_PATTERN" "$DNS_CREDENTIAL_HINT"
                     acme_dns_namedotcom_user="$REPLY"
-                    secret 'name.com API token' false 1 false
+                    dns_secret 'name.com API token'
                     acme_dns_namedotcom_token="$REPLY"
                     ;;
             esac

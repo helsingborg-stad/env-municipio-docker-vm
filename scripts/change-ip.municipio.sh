@@ -166,6 +166,26 @@ start_proxy_any() {
     fi
 }
 
+# The secondary leaves this on the shared volume once it is Synced. Until then the
+# primary must not restart MariaDB: a joiner cut off mid state transfer leaves two
+# nodes that each lack a complete copy, and neither can form the Primary component.
+peer_synced_signal() { printf '%s/.ip-change-%s-synced' "$DATA_ROOT" "$1"; }
+
+mark_safe_to_bootstrap() {
+    local grastate="$DB_DATA_ROOT/grastate.dat" owner
+    owner="$(stat -c %u:%g "$grastate")"
+    perl -pi -e 's/^safe_to_bootstrap:\s*0\s*$/safe_to_bootstrap: 1\n/' "$grastate"
+    chown "$owner" "$grastate"
+}
+
+bootstrap_primary() {
+    rm -f "$(peer_synced_signal "$PEER_NAME")"
+    touch "$(galera_bootstrap_marker)"
+    compose_galera_bootstrap up -d --no-deps --force-recreate db
+    wait_for_database 600 || die 'MariaDB did not start'
+    db_primary || die 'MariaDB did not reach the Primary component'
+}
+
 stop_gluster() {
     if mountpoint -q "$DATA_ROOT"; then
         # A client cut off from its bricks can hang a normal unmount.
@@ -386,15 +406,10 @@ if ! reached database; then
                     die "MariaDB on $NODE_NAME did not stop as the last cluster member. If $PEER_NAME was not promoted (no $(galera_bootstrap_marker) there), $NODE_NAME is authoritative: set 'safe_to_bootstrap: 1' in $grastate and run this script again. It resumes here."
                 fi
                 log 'Marking grastate.dat safe to bootstrap, as confirmed at the start'
-                owner="$(stat -c %u:%g "$grastate")"
-                perl -pi -e 's/^safe_to_bootstrap:\s*0\s*$/safe_to_bootstrap: 1\n/' "$grastate"
-                chown "$owner" "$grastate"
+                mark_safe_to_bootstrap
             fi
             log 'Bootstrapping Galera on the primary'
-            touch "$(galera_bootstrap_marker)"
-            compose_galera_bootstrap up -d --no-deps --force-recreate db
-            wait_for_database 600 || die 'MariaDB did not start'
-            db_primary || die 'MariaDB did not reach the Primary component'
+            bootstrap_primary
         fi
     else
         if db_synced; then
@@ -408,6 +423,7 @@ if ! reached database; then
             wait_for_database 3600 || die 'MariaDB did not complete its state transfer'
             wait_until 'Waiting for MariaDB to reach Synced' 600 db_synced || die 'MariaDB did not reach Synced'
         fi
+        touch "$(peer_synced_signal "$NODE_NAME")"
     fi
     save_stage database
 fi
@@ -422,10 +438,25 @@ if ! reached application; then
 fi
 
 if [[ "$IS_PRIMARY" == true && -f "$(galera_bootstrap_marker)" ]]; then
+    signal="$(peer_synced_signal "$PEER_NAME")"
+    if ! wait_until 'Checking that MariaDB is in the Primary component' 60 db_primary; then
+        # The bootstrap flag is still set and the secondary never reported Synced, so
+        # this node still holds the only complete copy and may bootstrap again.
+        [[ ! -f "$signal" ]] || \
+            die "MariaDB is not Primary, but $PEER_NAME already reported Synced. Compare both nodes before bootstrapping; see docs/failover.md."
+        log "MariaDB lost the Primary component before $PEER_NAME finished joining; bootstrapping again from $NODE_NAME"
+        compose stop -t 120 db
+        mark_safe_to_bootstrap
+        bootstrap_primary
+    fi
     log "The site is up on $NODE_NAME. If you stop waiting (Ctrl-C), run this script again later to finish."
-    wait_until "Waiting for $PEER_NAME to join Galera. Run this script on $PEER_NAME if you have not yet." \
-        0 cluster_size_two
+    peer_finished_joining() {
+        [[ -f "$signal" ]] && cluster_size_two && [[ "$(db_value wsrep_local_state_comment)" == Synced ]]
+    }
+    wait_until "Waiting for $PEER_NAME to finish joining Galera. Run this script on $PEER_NAME if you have not yet." \
+        0 peer_finished_joining
     /scripts/cluster.municipio.sh clear-bootstrap-flag
+    rm -f "$signal"
 fi
 if ! wait_until "Waiting for Gluster to show $PEER_NAME as connected" 60 peer_connected; then
     log "WARNING: Gluster does not show $PEER_NAME as connected. Run on both servers: systemctl restart glusterd; then check gluster peer status"

@@ -101,9 +101,12 @@ yes_no() {
 # OPTIONAL=true lets Enter return an empty value, which the caller replaces.
 # CONFIRM=false skips the second entry, for pasted values rather than new passwords.
 secret() {
-    local label="$1" optional="${2:-false}" min_length="${3:-1}" confirm_entry="${4:-true}" answer confirm
+    local label="$1" optional="${2:-false}" min_length="${3:-1}" confirm_entry="${4:-true}" answer confirm optional_hint=
+    if [[ "$optional" == true ]]; then
+        optional_hint=' (press Enter to create one automatically)'
+    fi
     while true; do
-        printf '%s%s: ' "$label" "$([[ "$optional" == true ]] && printf ' (press Enter to create one automatically)' || true)" >&2
+        printf '%s%s: ' "$label" "$optional_hint" >&2
         IFS= read -r -s -u 3 answer || exit 1
         printf '\n' >&2
         if [[ -z "$answer" ]]; then
@@ -282,7 +285,7 @@ if [[ -e /etc/municipio/municipio.env ]]; then
     exit 0
 fi
 
-detect_platform
+detect_platform /etc/os-release "$(dpkg --print-architecture)"
 
 printf 'Welcome to the Municipio installer (%s %s).\n' "$PLATFORM_ID" "$PLATFORM_VERSION" >&2
 say 'You will be asked a few questions. The suggested answer is shown in [brackets];'

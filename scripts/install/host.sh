@@ -3,7 +3,7 @@ set -euo pipefail
 source "${MUNICIPIO_REPO_ROOT}/scripts/lib/common.sh"
 source "${MUNICIPIO_REPO_ROOT}/scripts/lib/platform.sh"
 load_config
-detect_platform
+detect_platform /etc/os-release "$(dpkg --print-architecture)"
 
 if [[ "${INSTALL_PACKAGES:-true}" == true ]]; then
     export DEBIAN_FRONTEND=noninteractive

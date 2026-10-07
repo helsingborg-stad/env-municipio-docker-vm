@@ -15,7 +15,9 @@ else
     docker inspect -f '{{.State.Running}}' municipio-app 2>/dev/null | grep -qx true
 fi
 curl -fsS -o /dev/null "http://${APP_BIND_ADDRESS:-127.0.0.1}:${APP_BIND_PORT:-8080}/"
-db_exec mariadb-admin --protocol=socket ping --silent
+# Without credentials the ping still succeeds, but MariaDB logs a denied root login
+# on every run of the 10-second timer.
+db_root mariadb-admin -uroot --protocol=socket ping --silent
 # The application reaches MariaDB only through this socket, so its presence on the host
 # is part of the health contract, not an implementation detail.
 [[ -S "${DB_SOCKET_DIR}/mysqld.sock" ]]

@@ -150,6 +150,22 @@ db_synced() { db_primary && [[ "$(db_value wsrep_local_state_comment)" == Synced
 peer_connected() { timeout 10 gluster peer status 2>/dev/null | grep -q 'Peer in Cluster (Connected)'; }
 cluster_size_two() { local size; size="$(db_value wsrep_cluster_size)"; [[ "$size" =~ ^[0-9]+$ && "$size" -ge 2 ]]; }
 
+# Older installs lack some timers and helper scripts, so only the present ones are used.
+TIMERS=()
+for unit in municipio-sites.timer municipio-health.timer; do
+    systemctl cat "$unit" >/dev/null 2>&1 && TIMERS+=("$unit")
+done
+
+start_proxy_any() {
+    if [[ -x /scripts/refresh-sites.municipio.sh ]]; then
+        /scripts/refresh-sites.municipio.sh
+    elif systemctl cat municipio-caddy.service >/dev/null 2>&1; then
+        systemctl restart municipio-caddy.service
+    else
+        compose up -d --no-deps caddy
+    fi
+}
+
 stop_gluster() {
     if mountpoint -q "$DATA_ROOT"; then
         # A client cut off from its bricks can hang a normal unmount.
@@ -282,7 +298,7 @@ if ! reached stopped; then
     log 'Stopping the site, MariaDB and Gluster on this node'
     /scripts/maintenance.municipio.sh on >/dev/null || true
     # The sites timer would start Caddy again within a minute.
-    systemctl stop municipio-sites.timer municipio-health.timer
+    ((${#TIMERS[@]} == 0)) || systemctl stop "${TIMERS[@]}"
     compose stop caddy municipio
     compose stop -t 120 db
     stop_gluster
@@ -399,8 +415,8 @@ fi
 if ! reached application; then
     log 'Starting the site'
     deploy_application
-    /scripts/refresh-sites.municipio.sh
-    systemctl start municipio-sites.timer municipio-health.timer
+    start_proxy_any
+    ((${#TIMERS[@]} == 0)) || systemctl start "${TIMERS[@]}"
     /scripts/maintenance.municipio.sh off
     save_stage application
 fi

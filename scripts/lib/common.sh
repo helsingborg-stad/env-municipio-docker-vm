@@ -86,8 +86,10 @@ validate_config() {
             die "DB_SOCKET_UID and DB_SOCKET_GID must be numeric"
         [[ "${APP_BIND_ADDRESS:-127.0.0.1}" == 127.0.0.1 ]] || \
             die 'APP_BIND_ADDRESS must be 127.0.0.1 so the application port stays local'
-        [[ "${APP_BIND_PORT:-8080}" =~ ^[0-9]+$ ]] && ((10#${APP_BIND_PORT:-8080} >= 1 && 10#${APP_BIND_PORT:-8080} <= 65535)) || \
+        if ! [[ "${APP_BIND_PORT:-8080}" =~ ^[0-9]+$ ]] || \
+            ! ((10#${APP_BIND_PORT:-8080} >= 1 && 10#${APP_BIND_PORT:-8080} <= 65535)); then
             die 'APP_BIND_PORT must be a number from 1 to 65535'
+        fi
         for path_name in DATA_ROOT DB_DATA_ROOT DB_SOCKET_DIR; do
             [[ "${!path_name}" == /* && "${!path_name}" != / ]] || \
                 die "$path_name must be an absolute, non-root path"

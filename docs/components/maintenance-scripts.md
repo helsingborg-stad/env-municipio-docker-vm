@@ -16,6 +16,7 @@ Provide simple local commands for maintenance after the interactive installation
 | `/scripts/health.municipio.sh` | Recalculate the health marker. |
 | `/scripts/cluster.municipio.sh` | Bootstrap, join, clear the Galera bootstrap flag, enable a Swarm worker, inspect, restore storage quorum, or clear shared cache. |
 | `/scripts/failover.municipio.sh` | Provision the DB or perform fenced manual promotion. |
+| `/scripts/change-ip.municipio.sh` | Move a `cluster-manual` data node to new IP addresses after the provider has changed them; see the [runbook](../runbook.md#change-the-ip-addresses-of-a-two-node-cluster). |
 | `/scripts/refresh-sites.municipio.sh` | Discover local WordPress sites and refresh the Caddy host list; see [site discovery](../site-discovery.md). |
 
 Scripts serialize application updates with `flock`. Cluster creation is never part of unattended installation.

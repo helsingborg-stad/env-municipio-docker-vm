@@ -83,6 +83,18 @@ sudo /scripts/cluster.municipio.sh start-arbitrator
 
 Verify `garb=active`, both Galera data nodes, and Gluster heal status before relying on automatic failover.
 
+## Change the IP addresses of a two-node cluster
+
+Gluster names its bricks by IP, and the Galera configuration of an initialized cluster is never regenerated, so a node does not follow an address change by itself. Once the provider has moved the addresses, run this on **both** data VMs, in either order:
+
+```bash
+sudo /scripts/change-ip.municipio.sh NEW_IP [PEER_NEW_IP]
+```
+
+`NEW_IP` is this server's new address and must already be configured on it. The other server's new address is asked for when `PEER_NEW_IP` is omitted. The script then stops the node and rewrites `municipio.env`, the Galera configuration, `/etc/fstab` and Gluster's metadata in `/var/lib/glusterd`, saving the previous files under `BACKUP_ROOT` first. The primary bootstraps Galera and serves again before the secondary is back. The secondary waits for the primary and joins it. The primary then waits for the secondary and clears the bootstrap flag.
+
+Progress is saved in `/etc/municipio/ip-change.state`, and running the script again resumes where it stopped. If MariaDB on the primary is not in the Primary component when the script starts, for example after a reboot, it asks you to confirm that the secondary was never promoted before it bootstraps from the primary. A secondary with the Galera bootstrap flag set is refused; recover that as a [full-cluster outage](failover.md#full-cluster-outage). It supports `cluster-manual` with Compose and IPv4 only. Firewall rules, load balancers and DNS that use the old addresses are reported, not changed.
+
 ## Update the application on one node
 
 ```bash

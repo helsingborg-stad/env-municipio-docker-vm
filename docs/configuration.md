@@ -28,6 +28,8 @@ NODE_NAME=municipio-01
 NODE_ADDRESS=10.20.0.11
 SITE_ADDRESS=www.example.se
 CADDY_SITE_ADDRESS=www.example.se
+ACME_DNS_PROVIDER=none
+ACME_DNS_CHALLENGE_DOMAIN=
 MUNICIPIO_IMAGE=ghcr.io/municipio-se/municipio-deployment-docker@sha256:...
 MARIADB_IMAGE=mariadb@sha256:...
 CADDY_IMAGE=caddy@sha256:...
@@ -94,3 +96,25 @@ The local `NODE_NAME` and `NODE_ADDRESS` must match the primary, secondary, or a
 In standalone mode Docker bind-mounts `DATA_ROOT` directly. In cluster mode the same path becomes the local GlusterFS view, backed by `GLUSTER_BRICK` on that VM's disk.
 
 `SITE_ADDRESS` is the setup WordPress hostname and the temporary proxy seed until WordPress starts. It can be an IDN. WP-CLI discovers the actual Caddy host list thereafter, but the setup hostname must appear explicitly in the WordPress result before a refresh can replace existing routes. Set `CADDY_SITE_ADDRESS` equal to `SITE_ADDRESS` for Caddy-managed TLS, or `:80` when an upstream HTTP load balancer terminates TLS. It is a TLS-mode switch, not an override for the host list. See [WordPress site discovery](site-discovery.md).
+
+## ACME DNS-01
+
+By default Caddy uses HTTP validation. Set `ACME_DNS_PROVIDER` to `loopia` or `namedotcom` to use DNS-01. DNS-01 requires a digest-pinned `CADDY_IMAGE` that was built with the matching Caddy DNS module; the site refresh refuses to activate a configuration when that module is absent.
+
+| Provider | Required credentials | Caddy module |
+| --- | --- | --- |
+| `loopia` | `ACME_DNS_LOOPIA_USERNAME`, `ACME_DNS_LOOPIA_PASSWORD` | `github.com/caddy-dns/loopia` |
+| `namedotcom` | `ACME_DNS_NAMEDOTCOM_USER`, `ACME_DNS_NAMEDOTCOM_TOKEN` | `github.com/caddy-dns/namedotcom` |
+
+`ACME_DNS_NAMEDOTCOM_SERVER` defaults to `https://api.name.com`. Loopia needs a separate API user (normally ending in `@loopiaapi`), rather than the normal account login.
+
+Leave `ACME_DNS_CHALLENGE_DOMAIN` empty for ordinary DNS-01: Caddy writes each site's normal `_acme-challenge.<site>` TXT record. To delegate a challenge to another DNS zone, create the CNAME yourself and set this value to its full target. For example, with a CNAME from `_acme-challenge.dns01.example.com` to `_acme-challenge.dns01.example.io` (note the top domain change), use:
+
+```dotenv
+ACME_DNS_PROVIDER=loopia
+ACME_DNS_CHALLENGE_DOMAIN=_acme-challenge.dns01.example.io
+ACME_DNS_LOOPIA_USERNAME=api-user@loopiaapi
+ACME_DNS_LOOPIA_PASSWORD=...
+```
+
+The provider API credentials must control the target zone (`example.io` in this example), not necessarily the certificate hostname's zone. The installer offers the same choice and stores the selected credentials only in root-owned `/etc/municipio/municipio.env`.

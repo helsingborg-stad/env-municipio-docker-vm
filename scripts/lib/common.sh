@@ -42,9 +42,18 @@ validate_config() {
     : "${DB_SOCKET_DIR:=/var/lib/municipio/mysqld-socket}"
     : "${DB_SOCKET_UID:=999}"
     : "${DB_SOCKET_GID:=999}"
+    : "${ACME_DNS_PROVIDER:=none}"
+    : "${ACME_DNS_CHALLENGE_DOMAIN:=}"
+    : "${ACME_DNS_LOOPIA_USERNAME:=}"
+    : "${ACME_DNS_LOOPIA_PASSWORD:=}"
+    : "${ACME_DNS_NAMEDOTCOM_USER:=}"
+    : "${ACME_DNS_NAMEDOTCOM_TOKEN:=}"
+    : "${ACME_DNS_NAMEDOTCOM_SERVER:=https://api.name.com}"
     export DEPLOYMENT_MODE DOCKER_SWARM NODE_ROLE INSTALL_ROOT CONFIG_ROOT DATA_ROOT \
         GLUSTER_BRICK BACKUP_ROOT HEALTH_ROOT DB_DATA_ROOT DB_SOCKET_DIR \
-        DB_SOCKET_UID DB_SOCKET_GID
+        DB_SOCKET_UID DB_SOCKET_GID ACME_DNS_PROVIDER ACME_DNS_CHALLENGE_DOMAIN \
+        ACME_DNS_LOOPIA_USERNAME ACME_DNS_LOOPIA_PASSWORD \
+        ACME_DNS_NAMEDOTCOM_USER ACME_DNS_NAMEDOTCOM_TOKEN ACME_DNS_NAMEDOTCOM_SERVER
     [[ "$DOCKER_SWARM" == 0 || "$DOCKER_SWARM" == 1 ]] || die "DOCKER_SWARM must be 0 or 1"
     case "$DEPLOYMENT_MODE" in
         standalone|cluster-manual|cluster-arbitrator) ;;
@@ -97,6 +106,26 @@ validate_config() {
         [[ "$SITE_ADDRESS" =~ ^[^[:space:]/:@#?{},]+$ ]] || die "SITE_ADDRESS must be a hostname without scheme, port or path"
         [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == :80 || "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == "$SITE_ADDRESS" ]] || \
             die "CADDY_SITE_ADDRESS must be :80 or match SITE_ADDRESS (WordPress controls the host list)"
+        case "$ACME_DNS_PROVIDER" in
+            none) ;;
+            loopia)
+                [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" != :80 ]] || \
+                    die 'ACME_DNS_PROVIDER cannot be used when upstream TLS is selected'
+                required ACME_DNS_LOOPIA_USERNAME
+                required ACME_DNS_LOOPIA_PASSWORD
+                ;;
+            namedotcom)
+                [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" != :80 ]] || \
+                    die 'ACME_DNS_PROVIDER cannot be used when upstream TLS is selected'
+                required ACME_DNS_NAMEDOTCOM_USER
+                required ACME_DNS_NAMEDOTCOM_TOKEN
+                [[ "$ACME_DNS_NAMEDOTCOM_SERVER" =~ ^https://[^[:space:]/]+$ ]] || \
+                    die 'ACME_DNS_NAMEDOTCOM_SERVER must be an HTTPS API URL without a path'
+                ;;
+            *) die 'ACME_DNS_PROVIDER must be none, loopia or namedotcom' ;;
+        esac
+        [[ -z "$ACME_DNS_CHALLENGE_DOMAIN" || "$ACME_DNS_CHALLENGE_DOMAIN" =~ ^_acme-challenge\.[A-Za-z0-9.-]+$ ]] || \
+            die 'ACME_DNS_CHALLENGE_DOMAIN must be a full _acme-challenge hostname'
     fi
     if [[ "$DEPLOYMENT_MODE" != standalone ]]; then
         required GLUSTER_BRICK

@@ -123,6 +123,9 @@ grep -Fq 'systemctl enable municipio-caddy.service' scripts/install/maintenance.
 grep -Fq 'tar -C "$DATA_ROOT" -czf "$target/files.tar.gz" uploads cache caddy' scripts/backup.municipio.sh
 grep -Fq 'install -d -m 0700 "$DATA_ROOT/caddy"' scripts/cluster.municipio.sh
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
+grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh
+grep -Fq 'dns.providers.namedotcom' scripts/refresh-sites.municipio.sh
+grep -Fq 'dns_challenge_override_domain' scripts/refresh-sites.municipio.sh
 
 # The installer must not install a database or web server package on data VMs.
 if grep -nE 'apt-get install[^|]*\b(mariadb-server|mariadb-client|mariadb-backup|caddy)\b' \
@@ -255,6 +258,12 @@ reject_config 'a mutable application image tag' \
     sed 's|^MUNICIPIO_IMAGE=.*$|MUNICIPIO_IMAGE=ghcr.io/municipio-se/municipio-deployment-docker:latest|'
 reject_config 'a mutable MariaDB image tag' sed 's|^MARIADB_IMAGE=.*$|MARIADB_IMAGE=mariadb:11.4|'
 reject_config 'a mutable Caddy image tag' sed 's|^CADDY_IMAGE=.*$|CADDY_IMAGE=caddy:2|'
+reject_config 'an unsupported ACME DNS provider' \
+    sed 's|^ACME_DNS_PROVIDER=.*$|ACME_DNS_PROVIDER=unsupported|'
+reject_config 'a Loopia DNS configuration without API credentials' \
+    sed 's|^ACME_DNS_PROVIDER=.*$|ACME_DNS_PROVIDER=loopia|'
+reject_config 'a malformed delegated ACME DNS record name' \
+    sed 's|^ACME_DNS_CHALLENGE_DOMAIN=.*$|ACME_DNS_CHALLENGE_DOMAIN=wrong.example.test|'
 # The MariaDB data directory on replicated storage corrupts silently, so refuse it early.
 reject_config 'a database directory inside DATA_ROOT' \
     sed 's|^DB_DATA_ROOT=.*$|DB_DATA_ROOT=/srv/municipio/data/mysql|'

@@ -72,6 +72,7 @@ trap 'rm -rf -- "$staging" "$previous"' EXIT
 if [[ -n "$sites" ]]; then
     generator_args=(--require-host "$SITE_ADDRESS")
     [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == :80 ]] && generator_args+=(--http-only)
+    [[ "$ACME_DNS_PROVIDER" != none ]] && generator_args+=(--dns-challenge)
     printf '%s\n' "$sites" | bash /usr/local/lib/municipio/build-caddy-sites.sh \
         "${generator_args[@]}" > "$staging/municipio-sites.caddy"
 else
@@ -84,6 +85,45 @@ if [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == :80 ]]; then
     }"
 else
     proxy_block="reverse_proxy ${APP_BIND_ADDRESS:-127.0.0.1}:${APP_BIND_PORT:-8080}"
+fi
+tls_snippet=
+if [[ "$ACME_DNS_PROVIDER" != none ]]; then
+    override_domain=
+    if [[ -n "$ACME_DNS_CHALLENGE_DOMAIN" ]]; then
+        override_domain="            dns_challenge_override_domain $ACME_DNS_CHALLENGE_DOMAIN"
+    fi
+    case "$ACME_DNS_PROVIDER" in
+        loopia)
+            tls_snippet="(municipio_tls) {
+    tls {
+        issuer acme {
+$override_domain
+            propagation_timeout 15m
+            dns loopia {
+                username {\$ACME_DNS_LOOPIA_USERNAME}
+                password {\$ACME_DNS_LOOPIA_PASSWORD}
+            }
+        }
+    }
+}"
+            module='dns.providers.loopia'
+            ;;
+        namedotcom)
+            tls_snippet="(municipio_tls) {
+    tls {
+        issuer acme {
+$override_domain
+            dns namedotcom {
+                user {\$ACME_DNS_NAMEDOTCOM_USER}
+                token {\$ACME_DNS_NAMEDOTCOM_TOKEN}
+                server {\$ACME_DNS_NAMEDOTCOM_SERVER}
+            }
+        }
+    }
+}"
+            module='dns.providers.namedotcom'
+            ;;
+    esac
 fi
 cat > "$staging/Caddyfile" <<EOF_CADDY
 {
@@ -98,13 +138,24 @@ cat > "$staging/Caddyfile" <<EOF_CADDY
     }
     $(printf '%b' "$proxy_block")
 }
+$tls_snippet
 import /etc/caddy/municipio-sites.caddy
 EOF_CADDY
 chmod 0644 "$staging/Caddyfile" "$staging/municipio-sites.caddy"
 # The Caddy image is pinned by digest. Both files are validated together through the
 # same path that the running container sees.
 docker image inspect "$CADDY_IMAGE" >/dev/null 2>&1 || docker pull -q "$CADDY_IMAGE" >/dev/null
-docker run --rm -v "$staging:/etc/caddy:ro" "$CADDY_IMAGE" \
+if [[ "$ACME_DNS_PROVIDER" != none ]]; then
+    docker run --rm "$CADDY_IMAGE" caddy list-modules | grep -Fxq "$module" || \
+        die "CADDY_IMAGE does not include $module; select a digest-pinned Caddy image built with the $ACME_DNS_PROVIDER DNS module"
+fi
+caddy_environment=()
+if [[ "$ACME_DNS_PROVIDER" == loopia ]]; then
+    caddy_environment=(-e ACME_DNS_LOOPIA_USERNAME -e ACME_DNS_LOOPIA_PASSWORD)
+elif [[ "$ACME_DNS_PROVIDER" == namedotcom ]]; then
+    caddy_environment=(-e ACME_DNS_NAMEDOTCOM_USER -e ACME_DNS_NAMEDOTCOM_TOKEN -e ACME_DNS_NAMEDOTCOM_SERVER)
+fi
+docker run --rm "${caddy_environment[@]}" -v "$staging:/etc/caddy:ro" "$CADDY_IMAGE" \
     caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
 if cmp -s "$staging/Caddyfile" "$main_file" && \

@@ -40,14 +40,19 @@ caddy_dir="$CONFIG_ROOT/caddy"
 install -d -m 0755 "$HEALTH_ROOT" "$caddy_dir"
 sites_file="$caddy_dir/municipio-sites.caddy"
 main_file="$caddy_dir/Caddyfile"
+retained_sites=false
 
 if [[ -z "$container" ]]; then
     if [[ "${1:-}" == --bootstrap-if-unavailable && ! -f "$sites_file" ]]; then
         log 'Application is not running; seeding Caddy with SITE_ADDRESS until WordPress can be queried'
         sites="$SITE_ADDRESS"
     elif [[ "${1:-}" == --bootstrap-if-unavailable ]]; then
-        log 'Application is not running; retaining the existing Caddy site list'
-        sites=
+        log 'Application is not running; retaining the existing Caddy site hostnames'
+        # Regenerate from the retained hostnames so the per-site TLS imports always
+        # match the current ACME_DNS_PROVIDER, even if it changed while WordPress was down.
+        sites="$(awk '/^[^[:space:]#].* [{]$/ { sub(/^http:\/\//, "", $1); print $1 }' "$sites_file")"
+        [[ -n "$sites" ]] || die 'The existing Caddy site list contains no hostnames'
+        retained_sites=true
     else
         die 'No local Municipio container is running; the existing Caddy site list was retained'
     fi
@@ -69,15 +74,13 @@ fi
 staging="$(mktemp -d)"
 previous="$(mktemp -d)"
 trap 'rm -rf -- "$staging" "$previous"' EXIT
-if [[ -n "$sites" ]]; then
-    generator_args=(--require-host "$SITE_ADDRESS")
-    [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == :80 ]] && generator_args+=(--http-only)
-    [[ "$ACME_DNS_PROVIDER" != none ]] && generator_args+=(--dns-challenge)
-    printf '%s\n' "$sites" | bash /usr/local/lib/municipio/build-caddy-sites.sh \
-        "${generator_args[@]}" > "$staging/municipio-sites.caddy"
-else
-    cp "$sites_file" "$staging/municipio-sites.caddy"
-fi
+generator_args=()
+# A retained list was already accepted while WordPress was reachable.
+[[ "$retained_sites" == true ]] || generator_args+=(--require-host "$SITE_ADDRESS")
+[[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == :80 ]] && generator_args+=(--http-only)
+[[ "$ACME_DNS_PROVIDER" != none ]] && generator_args+=(--dns-challenge)
+printf '%s\n' "$sites" | bash /usr/local/lib/municipio/build-caddy-sites.sh \
+    "${generator_args[@]}" > "$staging/municipio-sites.caddy"
 
 if [[ "${CADDY_SITE_ADDRESS:-$SITE_ADDRESS}" == :80 ]]; then
     proxy_block="reverse_proxy ${APP_BIND_ADDRESS:-127.0.0.1}:${APP_BIND_PORT:-8080} {
@@ -100,8 +103,8 @@ if [[ "$ACME_DNS_PROVIDER" != none ]]; then
 $override_domain
             propagation_timeout 15m
             dns loopia {
-                username {\$ACME_DNS_LOOPIA_USERNAME}
-                password {\$ACME_DNS_LOOPIA_PASSWORD}
+                username \"{\$ACME_DNS_LOOPIA_USERNAME}\"
+                password \"{\$ACME_DNS_LOOPIA_PASSWORD}\"
             }
         }
     }
@@ -114,9 +117,9 @@ $override_domain
         issuer acme {
 $override_domain
             dns namedotcom {
-                user {\$ACME_DNS_NAMEDOTCOM_USER}
-                token {\$ACME_DNS_NAMEDOTCOM_TOKEN}
-                server {\$ACME_DNS_NAMEDOTCOM_SERVER}
+                user \"{\$ACME_DNS_NAMEDOTCOM_USER}\"
+                token \"{\$ACME_DNS_NAMEDOTCOM_TOKEN}\"
+                server \"{\$ACME_DNS_NAMEDOTCOM_SERVER}\"
             }
         }
     }
@@ -146,7 +149,11 @@ chmod 0644 "$staging/Caddyfile" "$staging/municipio-sites.caddy"
 # same path that the running container sees.
 docker image inspect "$CADDY_IMAGE" >/dev/null 2>&1 || docker pull -q "$CADDY_IMAGE" >/dev/null
 if [[ "$ACME_DNS_PROVIDER" != none ]]; then
-    docker run --rm "$CADDY_IMAGE" caddy list-modules | grep -Fxq "$module" || \
+    # Capture first: grep -q exits on the first match, and under pipefail the
+    # resulting SIGPIPE in docker run would fail the check spuriously.
+    caddy_modules="$(docker run --rm "$CADDY_IMAGE" caddy list-modules)" || \
+        die 'Could not list the modules in CADDY_IMAGE'
+    grep -Fxq "$module" <<<"$caddy_modules" || \
         die "CADDY_IMAGE does not include $module; select a digest-pinned Caddy image built with the $ACME_DNS_PROVIDER DNS module"
 fi
 caddy_environment=()

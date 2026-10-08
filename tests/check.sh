@@ -120,9 +120,12 @@ fi
 # the directory only after Gluster has mounted it.
 grep -Fq 'RequiresMountsFor="@CADDY_DATA_ROOT@"' systemd/municipio-caddy.service.in
 grep -Fq 'systemctl enable municipio-caddy.service' scripts/install/maintenance.sh
-grep -Fq 'tar -C "$DATA_ROOT" -czf "$target/files.tar.gz" uploads cache caddy' scripts/backup.municipio.sh
-grep -Fq 'install -d -m 0700 "$DATA_ROOT/caddy"' scripts/cluster.municipio.sh
+grep -Fq "tar -C \"\$DATA_ROOT\" -czf \"\$target/files.tar.gz\" uploads cache caddy" scripts/backup.municipio.sh
+grep -Fq "install -d -m 0700 \"\$DATA_ROOT/caddy\"" scripts/cluster.municipio.sh
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
+grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh
+grep -Fq 'dns.providers.namedotcom' scripts/refresh-sites.municipio.sh
+grep -Fq 'dns_challenge_override_domain' scripts/refresh-sites.municipio.sh
 
 # The installer must not install a database or web server package on data VMs.
 if grep -nE 'apt-get install[^|]*\b(mariadb-server|mariadb-client|mariadb-backup|caddy)\b' \
@@ -191,6 +194,15 @@ if command -v psl >/dev/null 2>&1; then
     [[ "$site_list" == *'http://www.example.co.uk {'* ]]
     [[ "$site_list" == *'http://www.xn--bcher-kva.se {'* ]]
     [[ "$site_list" != *'www.blog.example.co.uk'* ]]
+    # A site list retained while WordPress is down is regenerated from its own hostnames,
+    # so a changed ACME_DNS_PROVIDER still adds or removes the per-site TLS import.
+    retained_hosts="$(printf '%s\n' "$site_list" | \
+        awk '/^[^[:space:]#].* [{]$/ { sub(/^http:\/\//, "", $1); print $1 }')"
+    [[ "$(printf '%s\n' "$retained_hosts" | bash scripts/lib/build-caddy-sites.sh --http-only)" == "$site_list" ]]
+    dns_list="$(printf '%s\n' "$retained_hosts" | bash scripts/lib/build-caddy-sites.sh --dns-challenge)"
+    [[ "$dns_list" == *$'example.co.uk {\n    import municipio_tls\n'* ]]
+    grep -Fq "awk '/^[^[:space:]#].* [{]\$/ { sub(/^http:\\/\\//, \"\", \$1); print \$1 }'" \
+        scripts/refresh-sites.municipio.sh
     # The installer hostname must appear in WordPress's own list. An alias generated
     # for an apex domain does not count as a registered WordPress site.
     printf 'example.co.uk\nblog.example.co.uk\n' | \
@@ -255,6 +267,25 @@ reject_config 'a mutable application image tag' \
     sed 's|^MUNICIPIO_IMAGE=.*$|MUNICIPIO_IMAGE=ghcr.io/municipio-se/municipio-deployment-docker:latest|'
 reject_config 'a mutable MariaDB image tag' sed 's|^MARIADB_IMAGE=.*$|MARIADB_IMAGE=mariadb:11.4|'
 reject_config 'a mutable Caddy image tag' sed 's|^CADDY_IMAGE=.*$|CADDY_IMAGE=caddy:2|'
+reject_config 'an unsupported ACME DNS provider' \
+    sed 's|^ACME_DNS_PROVIDER=.*$|ACME_DNS_PROVIDER=unsupported|'
+reject_config 'a Loopia DNS configuration without API credentials' \
+    sed 's|^ACME_DNS_PROVIDER=.*$|ACME_DNS_PROVIDER=loopia|'
+reject_config 'a Loopia password that would break the generated Caddyfile' sed \
+    -e 's|^ACME_DNS_PROVIDER=.*$|ACME_DNS_PROVIDER=loopia|' \
+    -e 's|^ACME_DNS_LOOPIA_USERNAME=.*$|ACME_DNS_LOOPIA_USERNAME=api@loopiaapi|' \
+    -e 's|^ACME_DNS_LOOPIA_PASSWORD=.*$|ACME_DNS_LOOPIA_PASSWORD='"'"'ab}cd'"'"'|'
+reject_config 'a name.com token containing a double quote' sed \
+    -e 's|^ACME_DNS_PROVIDER=.*$|ACME_DNS_PROVIDER=namedotcom|' \
+    -e 's|^ACME_DNS_NAMEDOTCOM_USER=.*$|ACME_DNS_NAMEDOTCOM_USER=user|' \
+    -e 's|^ACME_DNS_NAMEDOTCOM_TOKEN=.*$|ACME_DNS_NAMEDOTCOM_TOKEN='"'"'ab"cd'"'"'|'
+# Credentials are quoted in the generated Caddyfile, so spaces remain valid.
+sed -e 's|^ACME_DNS_PROVIDER=.*$|ACME_DNS_PROVIDER=loopia|' \
+    -e 's|^ACME_DNS_LOOPIA_USERNAME=.*$|ACME_DNS_LOOPIA_USERNAME=api@loopiaapi|' \
+    -e "s|^ACME_DNS_LOOPIA_PASSWORD=.*\$|ACME_DNS_LOOPIA_PASSWORD='ab cd'|" .env.example > "$bad_env"
+MUNICIPIO_ENV_FILE="$bad_env" bash -c 'source scripts/lib/common.sh; load_config' >/dev/null
+reject_config 'a malformed delegated ACME DNS record name' \
+    sed 's|^ACME_DNS_CHALLENGE_DOMAIN=.*$|ACME_DNS_CHALLENGE_DOMAIN=wrong.example.test|'
 # The MariaDB data directory on replicated storage corrupts silently, so refuse it early.
 reject_config 'a database directory inside DATA_ROOT' \
     sed 's|^DB_DATA_ROOT=.*$|DB_DATA_ROOT=/srv/municipio/data/mysql|'

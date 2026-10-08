@@ -2,20 +2,22 @@
 set -euo pipefail
 
 http_only=false
+dns_challenge=false
 required_host=
 while (($#)); do
     case "$1" in
         --http-only) http_only=true; shift ;;
+        --dns-challenge) dns_challenge=true; shift ;;
         --require-host)
             [[ $# -ge 2 && -n "$2" ]] || {
-                echo 'Usage: build-caddy-sites.sh [--http-only] [--require-host HOST]' >&2
+                echo 'Usage: build-caddy-sites.sh [--http-only] [--dns-challenge] [--require-host HOST]' >&2
                 exit 2
             }
             required_host="$2"
             shift 2
             ;;
         *)
-            echo 'Usage: build-caddy-sites.sh [--http-only] [--require-host HOST]' >&2
+            echo 'Usage: build-caddy-sites.sh [--http-only] [--dns-challenge] [--require-host HOST]' >&2
             exit 2
             ;;
     esac
@@ -77,5 +79,9 @@ done
 
 while IFS= read -r host; do
     [[ "$http_only" == true ]] && host="http://$host"
-    printf '%s {\n    import municipio_proxy\n}\n\n' "$host"
+    if [[ "$dns_challenge" == true ]]; then
+        printf '%s {\n    import municipio_tls\n    import municipio_proxy\n}\n\n' "$host"
+    else
+        printf '%s {\n    import municipio_proxy\n}\n\n' "$host"
+    fi
 done < <(LC_ALL=C sort -u "$hosts_file")

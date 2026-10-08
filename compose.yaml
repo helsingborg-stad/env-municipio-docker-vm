@@ -39,6 +39,14 @@ services:
     # auto-start it first against an unmounted local directory.
     restart: "no"
     network_mode: host
+    environment:
+      # Kept in the root-only Municipio dotenv file; Caddy expands these only while
+      # loading its generated configuration, so credentials never enter the Caddyfile.
+      ACME_DNS_LOOPIA_USERNAME: ${ACME_DNS_LOOPIA_USERNAME:-}
+      ACME_DNS_LOOPIA_PASSWORD: ${ACME_DNS_LOOPIA_PASSWORD:-}
+      ACME_DNS_NAMEDOTCOM_USER: ${ACME_DNS_NAMEDOTCOM_USER:-}
+      ACME_DNS_NAMEDOTCOM_TOKEN: ${ACME_DNS_NAMEDOTCOM_TOKEN:-}
+      ACME_DNS_NAMEDOTCOM_SERVER: ${ACME_DNS_NAMEDOTCOM_SERVER:-https://api.name.com}
     volumes:
       # The directory is mounted, not the file: an in-place config replacement swaps the
       # inode and would detach a single-file bind mount.

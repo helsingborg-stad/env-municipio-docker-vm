@@ -38,6 +38,26 @@ ask() {
     done
 }
 
+# optional_ask LABEL [DEFAULT] [PATTERN] [HINT]. Unlike ask, an empty reply is valid.
+optional_ask() {
+    local label="$1" default="${2:-}" pattern="${3:-}" hint="${4:-}" answer
+    while true; do
+        if [[ -n "$default" ]]; then
+            printf '%s [%s] (press Enter to leave empty): ' "$label" "$default" >&2
+        else
+            printf '%s (press Enter to leave empty): ' "$label" >&2
+        fi
+        IFS= read -r -u 3 answer || exit 1
+        answer="${answer:-$default}"
+        if [[ -n "$answer" && -n "$pattern" && ! "$answer" =~ $pattern ]]; then
+            say "${hint:-That value is not valid.}"
+            continue
+        fi
+        REPLY="$answer"
+        return
+    done
+}
+
 # menu LABEL DEFAULT_KEY KEY "DESCRIPTION" [KEY "DESCRIPTION"]...
 # Prints a numbered list. The answer may be the number or the key; REPLY is the key.
 menu() {
@@ -81,9 +101,12 @@ yes_no() {
 # OPTIONAL=true lets Enter return an empty value, which the caller replaces.
 # CONFIRM=false skips the second entry, for pasted values rather than new passwords.
 secret() {
-    local label="$1" optional="${2:-false}" min_length="${3:-1}" confirm_entry="${4:-true}" answer confirm
+    local label="$1" optional="${2:-false}" min_length="${3:-1}" confirm_entry="${4:-true}" answer confirm optional_hint=
+    if [[ "$optional" == true ]]; then
+        optional_hint=' (press Enter to create one automatically)'
+    fi
     while true; do
-        printf '%s%s: ' "$label" "$([[ "$optional" == true ]] && printf ' (press Enter to create one automatically)' || true)" >&2
+        printf '%s%s: ' "$label" "$optional_hint" >&2
         IFS= read -r -s -u 3 answer || exit 1
         printf '\n' >&2
         if [[ -z "$answer" ]]; then
@@ -144,6 +167,19 @@ NAME_HINT='Use only letters, digits, dots, dashes and underscores (for example: 
 ADDRESS_PATTERN='^[A-Za-z0-9.:-]+$'
 ADDRESS_HINT='Enter an IP address such as 10.20.0.11.'
 EMAIL_PATTERN='^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+IMAGE_PATTERN='^[A-Za-z0-9._/-]+@sha256:[a-f0-9]{64}$'
+DNS_CHALLENGE_DOMAIN_PATTERN='^_acme-challenge\.[A-Za-z0-9.-]+$'
+DNS_CREDENTIAL_PATTERN='^[^"\\{}]+$'
+DNS_CREDENTIAL_HINT='DNS API credentials cannot contain double quotes, backslashes or braces.'
+
+# dns_secret LABEL. A pasted provider credential that must also satisfy DNS_CREDENTIAL_PATTERN.
+dns_secret() {
+    while true; do
+        secret "$1" false 1 false
+        [[ "$REPLY" =~ $DNS_CREDENTIAL_PATTERN ]] && return
+        say "$DNS_CREDENTIAL_HINT"
+    done
+}
 
 detected_address() {
     local address
@@ -260,7 +296,7 @@ if [[ -e /etc/municipio/municipio.env ]]; then
     exit 0
 fi
 
-detect_platform
+detect_platform /etc/os-release "$(dpkg --print-architecture)"
 
 printf 'Welcome to the Municipio installer (%s %s).\n' "$PLATFORM_ID" "$PLATFORM_VERSION" >&2
 say 'You will be asked a few questions. The suggested answer is shown in [brackets];'
@@ -330,7 +366,10 @@ if [[ "$deployment_mode" != standalone ]]; then
 fi
 
 runtime=compose docker_swarm=0
-site_address='' caddy_address='' tls_mode=caddy
+site_address='' caddy_address='' tls_mode=caddy caddy_image="$(sed -n 's/^CADDY_IMAGE=//p' "$ROOT_DIR/.env.example")"
+acme_dns_provider=none acme_dns_challenge_domain=''
+acme_dns_loopia_username='' acme_dns_loopia_password=''
+acme_dns_namedotcom_user='' acme_dns_namedotcom_token='' acme_dns_namedotcom_server='https://api.name.com'
 db_name=municipio db_user=municipio db_password='' db_root_password=''
 wp_admin_user=admin wp_admin_password='' wp_admin_email=''
 generated_admin_password=false
@@ -351,6 +390,38 @@ if [[ "$node_role" == data ]]; then
     tls_mode="$REPLY"
     caddy_address="$site_address"
     [[ "$tls_mode" == upstream ]] && caddy_address=:80
+    if [[ "$tls_mode" == caddy ]]; then
+        menu 'Which ACME certificate challenge should Caddy use?' http \
+            http 'HTTP-01: answer the certificate check on this server (default; port 80 must reach it)' \
+            dns 'DNS-01: add temporary DNS records through a DNS provider API'
+        if [[ "$REPLY" == dns ]]; then
+            menu 'Which DNS provider holds the ACME challenge record?' loopia \
+                loopia 'Loopia (loopia.se)' \
+                namedotcom 'name.com'
+            acme_dns_provider="$REPLY"
+            optional_ask 'Custom ACME challenge domain (CNAME target)' '' "$DNS_CHALLENGE_DOMAIN_PATTERN" \
+                'Use a full name such as _acme-challenge.kris.helsingborg.io, or press Enter for the normal record on each site.'
+            acme_dns_challenge_domain="$REPLY"
+            case "$acme_dns_provider" in
+                loopia)
+                    ask 'Loopia API user name (usually ending in @loopiaapi)' '' "$DNS_CREDENTIAL_PATTERN" "$DNS_CREDENTIAL_HINT"
+                    acme_dns_loopia_username="$REPLY"
+                    dns_secret 'Loopia API password'
+                    acme_dns_loopia_password="$REPLY"
+                    ;;
+                namedotcom)
+                    ask 'name.com API user name' '' "$DNS_CREDENTIAL_PATTERN" "$DNS_CREDENTIAL_HINT"
+                    acme_dns_namedotcom_user="$REPLY"
+                    dns_secret 'name.com API token'
+                    acme_dns_namedotcom_token="$REPLY"
+                    ;;
+            esac
+            say 'DNS-01 needs a Caddy image that includes the selected provider module.'
+            ask 'Digest-pinned Caddy image with that DNS module' '' "$IMAGE_PATTERN" \
+                'Enter an image reference ending in @sha256:<64 lowercase hex characters>.'
+            caddy_image="$REPLY"
+        fi
+    fi
 
     ask 'Email address of the WordPress administrator' '' "$EMAIL_PATTERN" \
         'Enter an email address such as webmaster@example.se.'
@@ -441,7 +512,6 @@ default_value() { sed -n "s/^$1=//p" "$ROOT_DIR/.env.example"; }
 COPIED_DEFAULT_NAMES='CONFIG_ROOT INSTALL_ROOT DATA_ROOT DB_DATA_ROOT DB_SOCKET_DIR DB_SOCKET_UID DB_SOCKET_GID GLUSTER_BRICK BACKUP_ROOT HEALTH_ROOT DB_HOST DB_TABLE_PREFIX APP_BIND_ADDRESS APP_BIND_PORT WP_SITE_TITLE WP_DEBUG WP_REDIS_DISABLED'
 image="$(default_value MUNICIPIO_IMAGE)"
 mariadb_image="$(default_value MARIADB_IMAGE)"
-caddy_image="$(default_value CADDY_IMAGE)"
 write_value DEPLOYMENT_MODE "$deployment_mode"
 write_value DOCKER_SWARM "$docker_swarm"
 write_value NODE_ROLE "$node_role"
@@ -458,6 +528,13 @@ write_value MARIADB_IMAGE "$mariadb_image"
 write_value CADDY_IMAGE "$caddy_image"
 write_value SITE_ADDRESS "$site_address"
 write_value CADDY_SITE_ADDRESS "$caddy_address"
+write_value ACME_DNS_PROVIDER "$acme_dns_provider"
+write_value ACME_DNS_CHALLENGE_DOMAIN "$acme_dns_challenge_domain"
+write_value ACME_DNS_LOOPIA_USERNAME "$acme_dns_loopia_username"
+write_value ACME_DNS_LOOPIA_PASSWORD "$acme_dns_loopia_password"
+write_value ACME_DNS_NAMEDOTCOM_USER "$acme_dns_namedotcom_user"
+write_value ACME_DNS_NAMEDOTCOM_TOKEN "$acme_dns_namedotcom_token"
+write_value ACME_DNS_NAMEDOTCOM_SERVER "$acme_dns_namedotcom_server"
 write_value DB_NAME "$db_name"
 write_value DB_USER "$db_user"
 write_value DB_PASSWORD "$db_password"

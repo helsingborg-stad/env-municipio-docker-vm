@@ -1,0 +1,78 @@
+name: Caddy image
+
+# Builds Caddy with the ACME DNS-01 modules and publishes it to GHCR. The digest it
+# reports goes into CADDY_IMAGE in .env.example; servers only ever pull by that digest.
+on:
+  push:
+    branches: [main]
+    paths:
+      - docker/caddy/**
+      - .github/workflows/caddy-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/municipio-caddy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Read Caddy version
+        id: version
+        run: echo "caddy=$(sed -n 's/^ARG CADDY_VERSION=//p' docker/caddy/Dockerfile)" >> "$GITHUB_OUTPUT"
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/caddy
+          platforms: linux/amd64
+          load: true
+          tags: municipio-caddy:test
+      # refresh-sites refuses a DNS-01 configuration without these modules, so a
+      # build that lost one must never be published.
+      - name: Verify DNS modules
+        run: |
+          modules="$(docker run --rm municipio-caddy:test caddy list-modules)"
+          for module in dns.providers.loopia dns.providers.namedotcom; do
+              grep -Fxq "$module" <<<"$modules" || { echo "::error::$module is missing"; exit 1; }
+          done
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish
+        id: publish
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/caddy
+          platforms: linux/amd64
+          push: true
+          # A single image manifest, so the reported digest is the one servers pull.
+          provenance: false
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.version.outputs.caddy }}
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.description=Caddy ${{ steps.version.outputs.caddy }} with the Loopia and name.com DNS modules
+      # The publish step rebuilds from cache; check the exact digest servers will pull.
+      - name: Verify published image
+        run: |
+            modules="$(docker run --rm "${IMAGE}@${{ steps.publish.outputs.digest }}" caddy list-modules)"
+            for module in dns.providers.loopia dns.providers.namedotcom; do
+                grep -Fxq "$module" <<<"$modules" || { echo "::error::$module is missing"; exit 1; }
+            done
+      - name: Report digest
+        run: |
+          {
+              echo 'Set this in `.env.example`:'
+              echo
+              echo '```'
+              echo "CADDY_IMAGE=${IMAGE}@${{ steps.publish.outputs.digest }}"
+              echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

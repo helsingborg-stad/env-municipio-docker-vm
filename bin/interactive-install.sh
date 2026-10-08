@@ -167,7 +167,6 @@ NAME_HINT='Use only letters, digits, dots, dashes and underscores (for example: 
 ADDRESS_PATTERN='^[A-Za-z0-9.:-]+$'
 ADDRESS_HINT='Enter an IP address such as 10.20.0.11.'
 EMAIL_PATTERN='^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
-IMAGE_PATTERN='^[A-Za-z0-9._/-]+@sha256:[a-f0-9]{64}$'
 DNS_CHALLENGE_DOMAIN_PATTERN='^_acme-challenge\.[A-Za-z0-9.-]+$'
 DNS_CREDENTIAL_PATTERN='^[^"\\{}]+$'
 DNS_CREDENTIAL_HINT='DNS API credentials cannot contain double quotes, backslashes or braces.'
@@ -187,7 +186,8 @@ acme_dns_namedotcom_user='' acme_dns_namedotcom_token='' acme_dns_namedotcom_ser
 
 # Asks how Caddy proves control of the site to the certificate authority. Shared by a
 # fresh installation and by an existing one whose saved settings predate DNS-01.
-# Sets the acme_dns_* answers and, for DNS-01, caddy_image.
+# Sets the acme_dns_* answers. The bundled CADDY_IMAGE (docker/caddy) includes every
+# supported DNS module, so no separate image is asked for.
 ask_acme_challenge() {
     menu 'Which ACME certificate challenge should Caddy use?' http \
         http 'HTTP-01: answer the certificate check on this server (default; port 80 must reach it)' \
@@ -214,14 +214,10 @@ ask_acme_challenge() {
             acme_dns_namedotcom_token="$REPLY"
             ;;
     esac
-    say 'DNS-01 needs a Caddy image that includes the selected provider module.'
-    ask 'Digest-pinned Caddy image with that DNS module' '' "$IMAGE_PATTERN" \
-        'Enter an image reference ending in @sha256:<64 lowercase hex characters>.'
-    caddy_image="$REPLY"
 }
 
-# caddy_image_has_dns_module. The same module check refresh-sites applies, made while the
-# image can still be asked for again; afterwards the saved file already holds the answer.
+# caddy_image_has_dns_module. The same module check refresh-sites applies, made before the
+# saved settings change; afterwards a re-run would no longer ask the DNS-01 question.
 caddy_image_has_dns_module() {
     local modules
     say 'Checking that the Caddy image includes the DNS module...'
@@ -375,15 +371,16 @@ if [[ -e /etc/municipio/municipio.env ]]; then
             [[ "$deployment_mode" == standalone ]] || \
                 say 'Give the same answers here on both website servers; they share certificate storage.'
             ask_acme_challenge
-            # Docker is usually running here; when an earlier attempt stopped before it was
-            # installed, refresh-sites still applies the check at the end of the installation.
-            if [[ "$acme_dns_provider" != none ]] && docker info >/dev/null 2>&1; then
-                while ! caddy_image_has_dns_module; do
-                    say "$caddy_image could not be pulled, or does not include dns.providers.$acme_dns_provider."
-                    ask 'Digest-pinned Caddy image with that DNS module' '' "$IMAGE_PATTERN" \
-                        'Enter an image reference ending in @sha256:<64 lowercase hex characters>.'
-                    caddy_image="$REPLY"
-                done
+            if [[ "$acme_dns_provider" != none ]]; then
+                # The saved image may be the stock Caddy image from an older installer.
+                caddy_image="$(default_value CADDY_IMAGE)"
+                # Docker is usually running here; when an earlier attempt stopped before it
+                # was installed, refresh-sites still applies the check at the end.
+                if docker info >/dev/null 2>&1 && ! caddy_image_has_dns_module; then
+                    say "This installer's Caddy image ($caddy_image) could not be pulled,"
+                    say "or does not include dns.providers.$acme_dns_provider. Nothing was changed."
+                    exit 1
+                fi
             fi
         fi
 

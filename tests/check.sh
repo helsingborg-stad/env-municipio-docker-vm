@@ -126,6 +126,11 @@ grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.namedotcom' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns_challenge_override_domain' scripts/refresh-sites.municipio.sh
+# The default Caddy image must carry every provider ACME_DNS_PROVIDER accepts.
+for module in loopia namedotcom; do
+    grep -Fq "github.com/caddy-dns/$module@" docker/caddy/Dockerfile
+    grep -Fq "dns.providers.$module" .github/workflows/caddy-image.yml
+done
 
 # The installer must not install a database or web server package on data VMs.
 if grep -nE 'apt-get install[^|]*\b(mariadb-server|mariadb-client|mariadb-backup|caddy)\b' \

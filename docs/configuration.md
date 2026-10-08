@@ -32,7 +32,7 @@ ACME_DNS_PROVIDER=none
 ACME_DNS_CHALLENGE_DOMAIN=
 MUNICIPIO_IMAGE=ghcr.io/municipio-se/municipio-deployment-docker@sha256:...
 MARIADB_IMAGE=mariadb@sha256:...
-CADDY_IMAGE=caddy@sha256:...
+CADDY_IMAGE=ghcr.io/helsingborg-stad/municipio-caddy@sha256:...
 DB_NAME=municipio
 DB_USER=municipio
 DB_PASSWORD=...
@@ -46,6 +46,8 @@ Set `DOCKER_SWARM=1` to use Swarm instead of Compose. It defaults to `0`. In a t
 All three services are pinned by digest and `validate_config` rejects mutable tags for every one of them. `update.municipio.sh` likewise requires a digest.
 
 Changing `MARIADB_IMAGE` or `CADDY_IMAGE` is a deliberate operator action, not a side effect of an application deployment; there is no automatic database upgrade on image change.
+
+`CADDY_IMAGE` is Caddy with the [ACME DNS-01](#acme-dns-01) provider modules compiled in, because Caddy has no runtime plugins. It is built from [`docker/caddy/Dockerfile`](../docker/caddy/Dockerfile) by the *Caddy image* GitHub Actions workflow, which checks that both DNS modules are present before it publishes `ghcr.io/helsingborg-stad/municipio-caddy` and prints the digest in its run summary. To update Caddy or a module, change the pinned versions in the Dockerfile, merge to `main`, and copy the reported digest into `.env.example`. The same image serves HTTP-01, so every new installation uses it; an existing server keeps its saved `CADDY_IMAGE` until DNS-01 is chosen or the image is changed deliberately.
 
 ## Credentials
 
@@ -99,7 +101,7 @@ In standalone mode Docker bind-mounts `DATA_ROOT` directly. In cluster mode the 
 
 ## ACME DNS-01
 
-By default Caddy uses HTTP validation. Set `ACME_DNS_PROVIDER` to `loopia` or `namedotcom` to use DNS-01. DNS-01 requires a digest-pinned `CADDY_IMAGE` that was built with the matching Caddy DNS module; the site refresh refuses to activate a configuration when that module is absent.
+By default Caddy uses HTTP validation. Set `ACME_DNS_PROVIDER` to `loopia` or `namedotcom` to use DNS-01. The default `CADDY_IMAGE` already includes both DNS modules (see [Images](#images)). A custom `CADDY_IMAGE` must include the matching module; the site refresh refuses to activate a configuration when it is absent.
 
 | Provider | Required credentials | Caddy module |
 | --- | --- | --- |

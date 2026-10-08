@@ -154,7 +154,7 @@ if [[ "$ACME_DNS_PROVIDER" != none ]]; then
     caddy_modules="$(docker run --rm "$CADDY_IMAGE" caddy list-modules)" || \
         die 'Could not list the modules in CADDY_IMAGE'
     grep -Fxq "$module" <<<"$caddy_modules" || \
-        die "CADDY_IMAGE does not include $module; select a digest-pinned Caddy image built with the $ACME_DNS_PROVIDER DNS module"
+        die "CADDY_IMAGE does not include $module; use the CADDY_IMAGE from .env.example, which is built with the DNS modules"
 fi
 caddy_environment=()
 if [[ "$ACME_DNS_PROVIDER" == loopia ]]; then

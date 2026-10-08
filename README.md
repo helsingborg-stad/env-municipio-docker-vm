@@ -43,7 +43,7 @@ sudo sh installer.sh
 
 The wizard first asks how many servers the site runs on; press Enter for a single server. It then asks only for the website address, who handles HTTPS, the WordPress administrator's email and a login password. Database passwords, the server name and address, and Docker Compose are chosen automatically; an optional *advanced settings* question lets experienced operators change them. When it finishes, the Caddy, MariaDB and Municipio containers are running and enabled for reboot. The effective configuration is stored at `/etc/municipio/municipio.env`; operational commands are installed under `/scripts`.
 
-The project documentation is published at [http://install.getmunicipio.com/](http://install.getmunicipio.com/). The custom domain serves the installer and uninstaller from this repository.
+The project documentation is published at [https://install.getmunicipio.com/](https://install.getmunicipio.com/). The custom domain serves the installer and uninstaller from this repository.
 
 ```bash
 sudo /scripts/status.municipio.sh

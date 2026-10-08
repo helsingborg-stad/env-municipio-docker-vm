@@ -4,7 +4,7 @@ This inventory answers which named services the **deployment described in this r
 
 | When | Initiator | Destination | Destination port | Purpose |
 | --- | --- | --- | --- | --- |
-| Installer download | Operator's VM (`curl`) | `install.getmunicipio.com` | TCP 443 | Fetch `installer.sh` or `uninstaller.sh` using the documented HTTPS commands. The documentation site itself is also linked over HTTP (TCP 80). |
+| Installer download | Operator's VM (`curl`) | `install.getmunicipio.com` | TCP 443 | Fetch `installer.sh` or `uninstaller.sh` using the documented HTTPS commands. The documentation site is served from the same host; plain HTTP (TCP 80) redirects to HTTPS. |
 | Installer bootstrap | VM (`installer.sh`) | `github.com` (typically redirecting the archive download to `codeload.github.com`) | TCP 443 | Fetch the repository source archive. `MUNICIPIO_SOURCE_URL` can replace this URL. |
 | Host package installation and removal | VM (`apt`) | The VM's configured Ubuntu or Debian package mirrors | Usually TCP 80 or 443, according to the VM's APT sources | Install prerequisites and, in cluster mode, GlusterFS and the arbitrator package; `apt-get update` also runs during uninstall. The repository does not choose the distribution mirror. |
 | Docker installation on a data VM, when Docker Engine is absent | VM (`curl`, `apt`) | `download.docker.com` | TCP 443 | Fetch Docker's signing key and install Docker Engine, CLI, Buildx plugin, and Compose plugin from Docker's APT repository. |

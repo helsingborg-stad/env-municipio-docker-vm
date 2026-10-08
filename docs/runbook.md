@@ -15,7 +15,7 @@ The exact port matrix is documented in [Network boundaries](components/network.m
 ## Interactive installation on the server
 
 ```bash
-curl -fL https://install.getmunicipio.com/installer.sh -o installer.sh
+curl -fL https://raw.githubusercontent.com/helsingborg-stad/env-municipio-docker-vm/main/installer.sh -o installer.sh
 sudo sh installer.sh
 sudo /scripts/status.municipio.sh
 ```

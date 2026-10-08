@@ -44,6 +44,11 @@ load_config
 [[ "$DOCKER_SWARM" == 0 ]] || \
     die 'Swarm deployments are not supported; the application must be redeployed from the manager'
 [[ -t 0 ]] || die 'Run this script interactively'
+# The VMs may run scripts from an older release than this one.
+for dep in /scripts/refresh-sites.municipio.sh /scripts/backup.municipio.sh /usr/local/lib/municipio/build-caddy-sites.sh; do
+    [[ -x "$dep" || ( "$dep" == *.sh && -f "$dep" ) ]] || \
+        die "$dep is missing; re-run installer.sh on this VM to install the current scripts first"
+done
 
 confirm() {
     local answer

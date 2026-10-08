@@ -17,6 +17,7 @@ Provide simple local commands for maintenance after the interactive installation
 | `/scripts/cluster.municipio.sh` | Bootstrap, join, clear the Galera bootstrap flag, enable a Swarm worker, inspect, restore storage quorum, or clear shared cache. |
 | `/scripts/failover.municipio.sh` | Provision the DB or perform fenced manual promotion. |
 | `/scripts/change-ip.municipio.sh` | Move a `cluster-manual` data node to new IP addresses after the provider has changed them; see the [runbook](../runbook.md#change-the-ip-addresses-of-a-two-node-cluster). |
+| `/scripts/change-domain.municipio.sh NEW_HOSTNAME` | Move the setup site to a new hostname: WordPress domain and stored URLs (primary only), `SITE_ADDRESS`/`CADDY_SITE_ADDRESS`, app container and Caddy routes. Run on the primary, then the secondary; see [site discovery](../site-discovery.md#changing-a-sites-domain). |
 | `/scripts/refresh-sites.municipio.sh` | Discover local WordPress sites and refresh the Caddy host list; see [site discovery](../site-discovery.md). |
 
 Scripts serialize application updates with `flock`. Cluster creation is never part of unattended installation.

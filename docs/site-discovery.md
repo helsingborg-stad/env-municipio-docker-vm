@@ -39,3 +39,5 @@ In a two-node cluster, refresh runs on each VM against its own local container. 
 ## Changing a site's domain
 
 Change the domain in WordPress using a separate, reviewed database/content migration and update DNS and TLS first. If changing the setup hostname, update `SITE_ADDRESS` (and `CADDY_SITE_ADDRESS` when it is a hostname) on each data VM as part of the migration. The refresh command only discovers the result and refuses to apply a list missing the configured setup hostname. For multisite, verify the site's `domain` field reflects the new hostname; for single-site, verify `home_url()` does. A force-SSL plugin changes the scheme, not historical hostnames in stored links.
+
+`/scripts/change-domain.municipio.sh NEW_HOSTNAME` performs this for the setup site. On the primary it takes a backup, shows a search-replace dry run, updates the multisite domain records and stored URLs, then updates `municipio.env`, recreates the application container and refreshes Caddy. On the secondary it checks that the change has replicated and does the rest.

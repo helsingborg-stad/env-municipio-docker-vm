@@ -7,7 +7,7 @@ install -d -m 0755 /scripts
 if [[ "$NODE_ROLE" == arbiter ]]; then
     scripts=(status monitor cluster)
 else
-    scripts=(update status monitor maintenance backup health cluster failover swarm-firewall refresh-sites change-ip)
+    scripts=(update status monitor maintenance backup health cluster failover swarm-firewall refresh-sites change-ip change-domain)
 fi
 for script in "${scripts[@]}"; do
     install -m 0750 "$MUNICIPIO_REPO_ROOT/scripts/${script}.municipio.sh" "/scripts/${script}.municipio.sh"

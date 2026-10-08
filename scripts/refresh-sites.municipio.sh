@@ -9,7 +9,14 @@ load_config
     die 'Usage: refresh-sites.municipio.sh [--bootstrap-if-unavailable]'
 
 exec 9>/run/lock/municipio-sites.lock
-flock -n 9 || die 'Another site refresh is running'
+if [[ "${1:-}" == --bootstrap-if-unavailable ]]; then
+    # The installer, the Caddy boot unit and cluster activation must apply the current
+    # settings, so they wait out a periodic refresh (which may be pulling a new image)
+    # rather than fail. The timer runs again within a minute, so it need not wait.
+    flock -w 600 9 || die 'Another site refresh is still running after 10 minutes'
+else
+    flock -n 9 || die 'Another site refresh is running'
+fi
 
 # A bind mount opened before Gluster is mounted remains attached to the underlying
 # local directory. Never start or refresh cluster Caddy until the shared mount is ready.

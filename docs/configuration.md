@@ -117,4 +117,4 @@ ACME_DNS_LOOPIA_USERNAME=api-user@loopiaapi
 ACME_DNS_LOOPIA_PASSWORD=...
 ```
 
-The provider API credentials must control the target zone (`example.io` in this example), not necessarily the certificate hostname's zone. The installer offers the same choice and stores the selected credentials only in root-owned `/etc/municipio/municipio.env`.
+The provider API credentials must control the target zone (`example.io` in this example), not necessarily the certificate hostname's zone. The installer offers the same choice and stores the selected credentials only in root-owned `/etc/municipio/municipio.env`. On a server installed before DNS-01 support, run the installer again: it detects the missing settings and asks this question without changing the rest of the configuration (see the [runbook](runbook.md)).

@@ -181,6 +181,71 @@ dns_secret() {
     done
 }
 
+acme_dns_provider=none acme_dns_challenge_domain=''
+acme_dns_loopia_username='' acme_dns_loopia_password=''
+acme_dns_namedotcom_user='' acme_dns_namedotcom_token='' acme_dns_namedotcom_server='https://api.name.com'
+
+# Asks how Caddy proves control of the site to the certificate authority. Shared by a
+# fresh installation and by an existing one whose saved settings predate DNS-01.
+# Sets the acme_dns_* answers and, for DNS-01, caddy_image.
+ask_acme_challenge() {
+    menu 'Which ACME certificate challenge should Caddy use?' http \
+        http 'HTTP-01: answer the certificate check on this server (default; port 80 must reach it)' \
+        dns 'DNS-01: add temporary DNS records through a DNS provider API'
+    [[ "$REPLY" == dns ]] || return 0
+    menu 'Which DNS provider holds the ACME challenge record?' loopia \
+        loopia 'Loopia (loopia.se)' \
+        namedotcom 'name.com'
+    acme_dns_provider="$REPLY"
+    optional_ask 'Custom ACME challenge domain (CNAME target)' '' "$DNS_CHALLENGE_DOMAIN_PATTERN" \
+        'Use a full name such as _acme-challenge.kris.helsingborg.io, or press Enter for the normal record on each site.'
+    acme_dns_challenge_domain="$REPLY"
+    case "$acme_dns_provider" in
+        loopia)
+            ask 'Loopia API user name (usually ending in @loopiaapi)' '' "$DNS_CREDENTIAL_PATTERN" "$DNS_CREDENTIAL_HINT"
+            acme_dns_loopia_username="$REPLY"
+            dns_secret 'Loopia API password'
+            acme_dns_loopia_password="$REPLY"
+            ;;
+        namedotcom)
+            ask 'name.com API user name' '' "$DNS_CREDENTIAL_PATTERN" "$DNS_CREDENTIAL_HINT"
+            acme_dns_namedotcom_user="$REPLY"
+            dns_secret 'name.com API token'
+            acme_dns_namedotcom_token="$REPLY"
+            ;;
+    esac
+    say 'DNS-01 needs a Caddy image that includes the selected provider module.'
+    ask 'Digest-pinned Caddy image with that DNS module' '' "$IMAGE_PATTERN" \
+        'Enter an image reference ending in @sha256:<64 lowercase hex characters>.'
+    caddy_image="$REPLY"
+}
+
+# caddy_image_has_dns_module. The same module check refresh-sites applies, made while the
+# image can still be asked for again; afterwards the saved file already holds the answer.
+caddy_image_has_dns_module() {
+    local modules
+    say 'Checking that the Caddy image includes the DNS module...'
+    docker pull -q "$caddy_image" >/dev/null || return 1
+    # Captured first: grep -q would end the pipe early and fail docker run under pipefail.
+    modules="$(docker run --rm "$caddy_image" caddy list-modules)" || return 1
+    grep -Fxq "dns.providers.$acme_dns_provider" <<<"$modules"
+}
+
+# The reviewed digests and path defaults ship with the source bundle.
+default_value() { sed -n "s/^$1=//p" "$ROOT_DIR/.env.example"; }
+# Settings the wizard does not ask about but must still write out verbatim. Kept on one
+# assignment so that tests/check.sh can read the list without parsing shell control flow.
+COPIED_DEFAULT_NAMES='CONFIG_ROOT INSTALL_ROOT DATA_ROOT DB_DATA_ROOT DB_SOCKET_DIR DB_SOCKET_UID DB_SOCKET_GID GLUSTER_BRICK BACKUP_ROOT HEALTH_ROOT DB_HOST DB_TABLE_PREFIX APP_BIND_ADDRESS APP_BIND_PORT WP_SITE_TITLE WP_DEBUG WP_REDIS_DISABLED'
+
+# Every setting a fresh installation writes: the write_value lines below plus the copied
+# defaults, read the same way tests/check.sh reads them.
+wizard_setting_names() {
+    {
+        sed -n 's/^write_value \([A-Z_][A-Z0-9_]*\).*/\1/p' "${BASH_SOURCE[0]}"
+        sed -n "s/^COPIED_DEFAULT_NAMES='\(.*\)'$/\1/p" "${BASH_SOURCE[0]}" | tr ' ' '\n'
+    } | grep -E '^[A-Z_][A-Z0-9_]*$' | sort -u
+}
+
 detected_address() {
     local address
     address="$(hostname -I 2>/dev/null | awk '{print $1}')"
@@ -270,16 +335,104 @@ if [[ -e /etc/municipio/municipio.env ]]; then
         say 'Nothing was changed.'
         exit 1
     fi
-    say 'This server already has saved Municipio settings (/etc/municipio/municipio.env),'
-    say 'from this installation or an interrupted setup.'
-    yes_no 'Continue that installation with the saved settings?' no
-    [[ "$REPLY" == yes ]] || { say 'Nothing was changed. To start over, run the uninstaller first.'; exit 0; }
-    bash "$ROOT_DIR/bin/install.sh" --env-file /etc/municipio/municipio.env
+    saved_env=/etc/municipio/municipio.env
     { read -r deployment_mode; read -r docker_swarm; read -r saved_role; read -r node_name
-      read -r node_address; read -r primary_name; } < <(MUNICIPIO_ENV_FILE=/etc/municipio/municipio.env bash -c \
+      read -r node_address; read -r primary_name; read -r saved_caddy_address; read -r caddy_image
+    } < <(MUNICIPIO_ENV_FILE="$saved_env" bash -c \
         'source "$1/scripts/lib/common.sh"; load_config
-         printf "%s\n" "$DEPLOYMENT_MODE" "$DOCKER_SWARM" "$NODE_ROLE" "$NODE_NAME" "$NODE_ADDRESS" "${PRIMARY_NODE_NAME:-}"' \
+         printf "%s\n" "$DEPLOYMENT_MODE" "$DOCKER_SWARM" "$NODE_ROLE" "$NODE_NAME" "$NODE_ADDRESS" \
+             "${PRIMARY_NODE_NAME:-}" "${CADDY_SITE_ADDRESS:-${SITE_ADDRESS:-}}" "${CADDY_IMAGE:-}"' \
         _ "$ROOT_DIR")
+
+    # Settings added to the installer after this server was installed. validate_config
+    # fills in defaults for the shell, so only the file's own text shows what is missing.
+    present_names="$(sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p' "$saved_env" | sort -u)"
+    missing_names=()
+    while IFS= read -r name; do
+        grep -Fxq "$name" <<<"$present_names" || missing_names+=("$name")
+    done < <(wizard_setting_names)
+
+    if ((${#missing_names[@]} == 0)); then
+        say "This server already has saved Municipio settings ($saved_env),"
+        say 'from this installation or an interrupted setup.'
+        yes_no 'Continue that installation with the saved settings?' no
+        [[ "$REPLY" == yes ]] || { say 'Nothing was changed. To start over, run the uninstaller first.'; exit 0; }
+        bash "$ROOT_DIR/bin/install.sh" --env-file "$saved_env"
+    else
+        say "This server already has saved Municipio settings ($saved_env)."
+        say 'This version of the installer has settings that file does not contain yet:'
+        for name in "${missing_names[@]}"; do say "  $name"; done
+        say 'Your existing settings are kept. Only the missing ones are added, and then the'
+        say 'installation is run again to bring this server up to date.'
+        yes_no 'Add the missing settings and update this installation?' no
+        [[ "$REPLY" == yes ]] || { say 'Nothing was changed.'; exit 0; }
+
+        ask_acme=false
+        if printf '%s\n' "${missing_names[@]}" | grep -Fxq ACME_DNS_PROVIDER && \
+            [[ "$saved_role" == data && "$saved_caddy_address" != :80 ]]; then
+            ask_acme=true
+            heading 'HTTPS certificate challenge (new setting)'
+            [[ "$deployment_mode" == standalone ]] || \
+                say 'Give the same answers here on both website servers; they share certificate storage.'
+            ask_acme_challenge
+            # Docker is usually running here; when an earlier attempt stopped before it was
+            # installed, refresh-sites still applies the check at the end of the installation.
+            if [[ "$acme_dns_provider" != none ]] && docker info >/dev/null 2>&1; then
+                while ! caddy_image_has_dns_module; do
+                    say "$caddy_image could not be pulled, or does not include dns.providers.$acme_dns_provider."
+                    ask 'Digest-pinned Caddy image with that DNS module' '' "$IMAGE_PATTERN" \
+                        'Enter an image reference ending in @sha256:<64 lowercase hex characters>.'
+                    caddy_image="$REPLY"
+                done
+            fi
+        fi
+
+        config_file="$(mktemp)"
+        chmod 0600 "$config_file"
+        trap 'rm -f -- "$config_file"' EXIT
+        # A fresh answer replaces every DNS-01 line, and a DNS-01 image replaces the saved one.
+        if [[ "$acme_dns_provider" != none ]]; then
+            grep -Ev '^(ACME_DNS_[A-Z0-9_]*|CADDY_IMAGE)=' "$saved_env" > "$config_file" || true
+        elif [[ "$ask_acme" == true ]]; then
+            grep -Ev '^ACME_DNS_[A-Z0-9_]*=' "$saved_env" > "$config_file" || true
+        else
+            cat "$saved_env" > "$config_file"
+        fi
+        [[ ! -s "$config_file" || -z "$(tail -c 1 "$config_file")" ]] || printf '\n' >> "$config_file"
+        [[ "$acme_dns_provider" == none ]] || write_value CADDY_IMAGE "$caddy_image"
+
+        unfilled=()
+        while IFS= read -r name; do
+            if grep -Fxq "$name" <<<"$present_names" && [[ "$ask_acme" == false || "$name" != ACME_DNS_* ]]; then
+                continue
+            fi
+            if [[ "$name" == ACME_DNS_* ]]; then
+                # Each ACME_DNS_X answer is held in acme_dns_x, which keeps its default
+                # when the question does not apply (an arbiter, or HTTPS terminated upstream).
+                answer_name="$(tr '[:upper:]' '[:lower:]' <<<"$name")"
+                write_value "$name" "${!answer_name}"
+            elif [[ " $COPIED_DEFAULT_NAMES " == *" $name "* ]]; then
+                write_value "$name" "$(default_value "$name")"
+            else
+                unfilled+=("$name")
+            fi
+        done < <(wizard_setting_names)
+
+        if ! problem="$(MUNICIPIO_ENV_FILE="$config_file" bash -c \
+            'source "$1/scripts/lib/common.sh"; load_config' _ "$ROOT_DIR" 2>&1 >/dev/null)"; then
+            say "The updated settings are not valid: ${problem#\[municipio\] ERROR: }"
+            say 'Nothing was changed.'
+            exit 1
+        fi
+        ((${#unfilled[@]} == 0)) || \
+            say "Left unset (no default, and the saved settings are valid without them): ${unfilled[*]}"
+        backup_env="$saved_env.$(date +%Y%m%d-%H%M%S).bak"
+        install -m 0600 "$saved_env" "$backup_env"
+        say "The previous settings were saved as $backup_env."
+        # install/host.sh installs this file as the new $saved_env.
+        bash "$ROOT_DIR/bin/install.sh" --env-file "$config_file"
+    fi
+
     if [[ "$deployment_mode" == standalone ]]; then
         /scripts/status.municipio.sh
         exit 0
@@ -366,10 +519,7 @@ if [[ "$deployment_mode" != standalone ]]; then
 fi
 
 runtime=compose docker_swarm=0
-site_address='' caddy_address='' tls_mode=caddy caddy_image="$(sed -n 's/^CADDY_IMAGE=//p' "$ROOT_DIR/.env.example")"
-acme_dns_provider=none acme_dns_challenge_domain=''
-acme_dns_loopia_username='' acme_dns_loopia_password=''
-acme_dns_namedotcom_user='' acme_dns_namedotcom_token='' acme_dns_namedotcom_server='https://api.name.com'
+site_address='' caddy_address='' tls_mode=caddy caddy_image="$(default_value CADDY_IMAGE)"
 db_name=municipio db_user=municipio db_password='' db_root_password=''
 wp_admin_user=admin wp_admin_password='' wp_admin_email=''
 generated_admin_password=false
@@ -390,38 +540,7 @@ if [[ "$node_role" == data ]]; then
     tls_mode="$REPLY"
     caddy_address="$site_address"
     [[ "$tls_mode" == upstream ]] && caddy_address=:80
-    if [[ "$tls_mode" == caddy ]]; then
-        menu 'Which ACME certificate challenge should Caddy use?' http \
-            http 'HTTP-01: answer the certificate check on this server (default; port 80 must reach it)' \
-            dns 'DNS-01: add temporary DNS records through a DNS provider API'
-        if [[ "$REPLY" == dns ]]; then
-            menu 'Which DNS provider holds the ACME challenge record?' loopia \
-                loopia 'Loopia (loopia.se)' \
-                namedotcom 'name.com'
-            acme_dns_provider="$REPLY"
-            optional_ask 'Custom ACME challenge domain (CNAME target)' '' "$DNS_CHALLENGE_DOMAIN_PATTERN" \
-                'Use a full name such as _acme-challenge.kris.helsingborg.io, or press Enter for the normal record on each site.'
-            acme_dns_challenge_domain="$REPLY"
-            case "$acme_dns_provider" in
-                loopia)
-                    ask 'Loopia API user name (usually ending in @loopiaapi)' '' "$DNS_CREDENTIAL_PATTERN" "$DNS_CREDENTIAL_HINT"
-                    acme_dns_loopia_username="$REPLY"
-                    dns_secret 'Loopia API password'
-                    acme_dns_loopia_password="$REPLY"
-                    ;;
-                namedotcom)
-                    ask 'name.com API user name' '' "$DNS_CREDENTIAL_PATTERN" "$DNS_CREDENTIAL_HINT"
-                    acme_dns_namedotcom_user="$REPLY"
-                    dns_secret 'name.com API token'
-                    acme_dns_namedotcom_token="$REPLY"
-                    ;;
-            esac
-            say 'DNS-01 needs a Caddy image that includes the selected provider module.'
-            ask 'Digest-pinned Caddy image with that DNS module' '' "$IMAGE_PATTERN" \
-                'Enter an image reference ending in @sha256:<64 lowercase hex characters>.'
-            caddy_image="$REPLY"
-        fi
-    fi
+    [[ "$tls_mode" != caddy ]] || ask_acme_challenge
 
     ask 'Email address of the WordPress administrator' '' "$EMAIL_PATTERN" \
         'Enter an email address such as webmaster@example.se.'
@@ -493,6 +612,8 @@ if [[ "$node_role" == data ]]; then
     say "Website:        https://$site_address/"
     if [[ "$tls_mode" == upstream ]]; then
         say 'HTTPS:          handled by a load balancer in front of this server'
+    elif [[ "$acme_dns_provider" != none ]]; then
+        say "HTTPS:          certificate obtained automatically by this server (DNS-01 via $acme_dns_provider)"
     else
         say 'HTTPS:          certificate obtained automatically by this server'
     fi
@@ -505,11 +626,6 @@ yes_no 'Install now?' yes
 config_file="$(mktemp)"
 chmod 0600 "$config_file"
 trap 'rm -f -- "$config_file"' EXIT
-# The reviewed digests and path defaults ship with the source bundle.
-default_value() { sed -n "s/^$1=//p" "$ROOT_DIR/.env.example"; }
-# Settings the wizard does not ask about but must still write out verbatim. Kept on one
-# assignment so that tests/check.sh can read the list without parsing shell control flow.
-COPIED_DEFAULT_NAMES='CONFIG_ROOT INSTALL_ROOT DATA_ROOT DB_DATA_ROOT DB_SOCKET_DIR DB_SOCKET_UID DB_SOCKET_GID GLUSTER_BRICK BACKUP_ROOT HEALTH_ROOT DB_HOST DB_TABLE_PREFIX APP_BIND_ADDRESS APP_BIND_PORT WP_SITE_TITLE WP_DEBUG WP_REDIS_DISABLED'
 image="$(default_value MUNICIPIO_IMAGE)"
 mariadb_image="$(default_value MARIADB_IMAGE)"
 write_value DEPLOYMENT_MODE "$deployment_mode"

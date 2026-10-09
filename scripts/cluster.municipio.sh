@@ -197,6 +197,12 @@ case "$action" in
     join)
         [[ "$NODE_ROLE" == data ]] || die 'Join must run on a data node'
         repair_fresh_rejected_peer
+        # Gluster's first probe can leave the initiating node at "Accepted peer
+        # request (Connected)" until the other node confirms the handshake. A
+        # join therefore probes the primary before it attempts the volume mount.
+        # This makes a simultaneous bootstrap/join converge without an operator
+        # having to run a second peer-probe manually.
+        wait_for_peer "$PRIMARY_NODE_ADDRESS" "$PRIMARY_NODE_NAME"
         mount_volume --wait-for-volume
         docker pull -q "$MARIADB_IMAGE" >/dev/null
         start_database

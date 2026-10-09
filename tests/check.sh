@@ -130,6 +130,7 @@ grep -Fq 'repair_fresh_rejected_peer()' scripts/cluster.municipio.sh
 grep -Fq 'Removing stale rejected Gluster peer' scripts/cluster.municipio.sh
 grep -Fq 'prepare-join)' scripts/cluster.municipio.sh
 grep -Fq '/scripts/cluster.municipio.sh prepare-join' bin/interactive-install.sh
+grep -Fq 'wait_for_peer "$PRIMARY_NODE_ADDRESS" "$PRIMARY_NODE_NAME"' scripts/cluster.municipio.sh
 grep -Fq "getent ahostsv4 \"\$host\"" scripts/cluster.municipio.sh
 grep -Fq 'ensure_volume_started()' scripts/cluster.municipio.sh
 grep -Fq 'waiting for Peer in Cluster (Connected)' scripts/cluster.municipio.sh

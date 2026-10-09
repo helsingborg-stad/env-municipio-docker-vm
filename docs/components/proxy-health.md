@@ -31,6 +31,8 @@ If either file changed and the container is already running, the refresh command
 
 `/healthz` is served from a marker file maintained by `municipio-health.timer` every ten seconds.
 
+The previous successful marker remains in place while the next health evaluation runs, so a healthy node does not briefly return 404 on every timer cycle. A failed or interrupted evaluation removes it. The systemd unit has a 25-second hard timeout and the local application probe has a 15-second timeout; therefore a hung evaluation is terminated and removes the marker. An external high-availability checker must also reject a stale marker (for example, by requiring it to be newer than 30 seconds) because a stopped timer cannot remove an existing file by itself.
+
 The marker exists only when:
 
 - maintenance mode is off;

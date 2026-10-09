@@ -153,6 +153,10 @@ grep -Fq 'Never schedule both data VMs for the same reboot window' docs/runbook.
 grep -Fq 'Detach a surviving server from a dead replica and restore writes' docs/failover.md
 grep -Fq 'Reattach a returning server and restore the cluster' docs/failover.md
 grep -Fq 'Do **not** use `gluster peer detach` as a failover mechanism' docs/failover.md
+grep -Fq 'trap remove_marker_on_failure EXIT' scripts/health.municipio.sh
+grep -Fq 'curl -fsS --max-time 15' scripts/health.municipio.sh
+grep -Fq 'TimeoutStartSec=25s' systemd/municipio-health.service
+grep -Fq 'external high-availability checker must also reject a stale marker' docs/components/proxy-health.md
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.namedotcom' scripts/refresh-sites.municipio.sh

@@ -7,14 +7,26 @@ load_config
 [[ "${NODE_ROLE:-data}" == data ]] || exit 0
 
 marker="${HEALTH_ROOT}/healthz"
-rm -f "$marker"
+# Keep the last successful marker while a new check is in progress. This avoids a
+# transient 404 from Caddy on every healthy timer run. Any failed or interrupted
+# evaluation removes it, so a node leaves load-balancer rotation promptly.
+remove_marker_on_failure() {
+    local status=$?
+    if ((status != 0)); then
+        rm -f "$marker"
+    fi
+    return "$status"
+}
+trap remove_marker_on_failure EXIT
+trap 'exit 1' INT TERM
+
 [[ ! -e /run/municipio/maintenance ]] || exit 1
 if [[ "$DOCKER_SWARM" == 1 ]]; then
     [[ -n "$(docker ps -q --filter label=com.docker.swarm.service.name="$(swarm_service_name)" --filter status=running)" ]]
 else
     docker inspect -f '{{.State.Running}}' municipio-app 2>/dev/null | grep -qx true
 fi
-curl -fsS -o /dev/null "http://${APP_BIND_ADDRESS:-127.0.0.1}:${APP_BIND_PORT:-8080}/"
+curl -fsS --max-time 15 -o /dev/null "http://${APP_BIND_ADDRESS:-127.0.0.1}:${APP_BIND_PORT:-8080}/"
 # Without credentials the ping still succeeds, but MariaDB logs a denied root login
 # on every run of the 10-second timer.
 db_root mariadb-admin -uroot --protocol=socket ping --silent

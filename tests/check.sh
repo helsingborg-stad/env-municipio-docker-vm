@@ -130,7 +130,8 @@ grep -Fq 'repair_fresh_rejected_peer()' scripts/cluster.municipio.sh
 grep -Fq 'Removing stale rejected Gluster peer' scripts/cluster.municipio.sh
 grep -Fq 'prepare-join)' scripts/cluster.municipio.sh
 grep -Fq '/scripts/cluster.municipio.sh prepare-join' bin/interactive-install.sh
-grep -Fq 'wait_for_peer "$PRIMARY_NODE_ADDRESS" "$PRIMARY_NODE_NAME"' scripts/cluster.municipio.sh
+grep -Fq 'wait_for_peer "$local_join_peer_address" "$local_join_peer_name"' scripts/cluster.municipio.sh
+grep -Fq 'local_join_peer_address="$SECONDARY_NODE_ADDRESS"' scripts/cluster.municipio.sh
 grep -Fq "getent ahostsv4 \"\$host\"" scripts/cluster.municipio.sh
 grep -Fq 'ensure_volume_started()' scripts/cluster.municipio.sh
 grep -Fq 'waiting for Peer in Cluster (Connected)' scripts/cluster.municipio.sh
@@ -147,6 +148,9 @@ grep -Fq 'resolved to an immutable digest' scripts/update.municipio.sh
 grep -Fq '15 3 * * 1 /scripts/update.municipio.sh municipio latest' docs/runbook.md
 grep -Fq 'Update installed Municipio scripts and system files' docs/runbook.md
 grep -Fq 'Confirm the prompt to continue the saved installation' docs/runbook.md
+grep -Fq 'Detach a surviving server from a dead replica and restore writes' docs/failover.md
+grep -Fq 'Reattach a returning server and restore the cluster' docs/failover.md
+grep -Fq 'Do **not** use `gluster peer detach` as a failover mechanism' docs/failover.md
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.namedotcom' scripts/refresh-sites.municipio.sh

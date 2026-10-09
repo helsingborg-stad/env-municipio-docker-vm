@@ -195,14 +195,22 @@ case "$action" in
         log 'Bootstrapped. Once the secondary has joined, run: clear-bootstrap-flag'
         ;;
     join)
+        local_join_peer_address="$PRIMARY_NODE_ADDRESS"
+        local_join_peer_name="$PRIMARY_NODE_NAME"
         [[ "$NODE_ROLE" == data ]] || die 'Join must run on a data node'
+        if [[ "$NODE_NAME" == "$PRIMARY_NODE_NAME" ]]; then
+            # A former primary returning after manual failover must contact the
+            # promoted secondary, not probe its own configured primary address.
+            local_join_peer_address="$SECONDARY_NODE_ADDRESS"
+            local_join_peer_name="$SECONDARY_NODE_NAME"
+        fi
         repair_fresh_rejected_peer
         # Gluster's first probe can leave the initiating node at "Accepted peer
         # request (Connected)" until the other node confirms the handshake. A
         # join therefore probes the primary before it attempts the volume mount.
         # This makes a simultaneous bootstrap/join converge without an operator
         # having to run a second peer-probe manually.
-        wait_for_peer "$PRIMARY_NODE_ADDRESS" "$PRIMARY_NODE_NAME"
+        wait_for_peer "$local_join_peer_address" "$local_join_peer_name"
         mount_volume --wait-for-volume
         docker pull -q "$MARIADB_IMAGE" >/dev/null
         start_database

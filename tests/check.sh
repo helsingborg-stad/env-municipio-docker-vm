@@ -124,6 +124,10 @@ grep -Fq "tar -C \"\$DATA_ROOT\" -czf \"\$target/files.tar.gz\" uploads cache ca
 grep -Fq "install -d -m 0700 \"\$DATA_ROOT/caddy\"" scripts/cluster.municipio.sh
 grep -Fq 'CLUSTER_START_WAIT_SECONDS=60' scripts/cluster.municipio.sh
 grep -Fq 'peer_is_connected()' scripts/cluster.municipio.sh
+grep -Fq 'repair_fresh_rejected_peer()' scripts/cluster.municipio.sh
+grep -Fq 'Removing stale rejected Gluster peer' scripts/cluster.municipio.sh
+grep -Fq 'prepare-join)' scripts/cluster.municipio.sh
+grep -Fq '/scripts/cluster.municipio.sh prepare-join' bin/interactive-install.sh
 grep -Fq "getent ahostsv4 \"\$host\"" scripts/cluster.municipio.sh
 grep -Fq 'ensure_volume_started()' scripts/cluster.municipio.sh
 grep -Fq 'waiting for Peer in Cluster (Connected)' scripts/cluster.municipio.sh

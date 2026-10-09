@@ -33,15 +33,49 @@ wait_for_peer() {
 peer_is_connected() {
     local address="$1" name="$2" host
     while IFS= read -r host; do
-        [[ "$host" == "$address" || "$host" == "$name" ]] && return 0
-        # glusterd may report a reverse-DNS name even when peer probe used an IP.
-        # Accept it only when that name resolves to the configured peer address.
-        getent ahostsv4 "$host" 2>/dev/null | awk -v address="$address" '$1 == address { found = 1 } END { exit !found }' && return 0
+        peer_host_matches "$host" "$address" "$name" && return 0
     done < <(timeout 5 gluster peer status 2>/dev/null | awk '
         /^Hostname:/ { host = $2 }
         /^State: Peer in Cluster \(Connected\)/ { print host }
     ')
     return 1
+}
+
+peer_host_matches() {
+    local host="$1" address="$2" name="$3"
+    [[ "$host" == "$address" || "$host" == "$name" ]] && return 0
+    # glusterd may report a reverse-DNS name even when peer probe used an IP.
+    # Accept it only when that name resolves to the configured peer address.
+    getent ahostsv4 "$host" 2>/dev/null | awk -v address="$address" '$1 == address { found = 1 } END { exit !found }'
+}
+
+peer_is_rejected() {
+    local address="$1" name="$2" host
+    while IFS= read -r host; do
+        peer_host_matches "$host" "$address" "$name" && return 0
+    done < <(timeout 5 gluster peer status 2>/dev/null | awk '
+        /^Hostname:/ { host = $2 }
+        /^State: Peer Rejected \(Connected\)/ { print host }
+    ')
+    return 1
+}
+
+gluster_has_no_volumes() {
+    ! timeout 5 gluster volume info 2>/dev/null | grep -q '^Volume Name:'
+}
+
+repair_fresh_rejected_peer() {
+    [[ "$NODE_NAME" == "$SECONDARY_NODE_NAME" ]] || return 0
+    peer_is_rejected "$PRIMARY_NODE_ADDRESS" "$PRIMARY_NODE_NAME" || return 0
+    [[ ! -f "$CONFIG_ROOT/cluster-initialized" ]] || \
+        die 'Gluster rejects the primary peer on an initialized node; refusing automatic repair to protect existing cluster data.'
+    gluster_has_no_volumes || \
+        die 'Gluster rejects the primary peer but local volumes exist; refusing automatic repair to protect existing cluster data.'
+    log "Removing stale rejected Gluster peer ${PRIMARY_NODE_NAME} (${PRIMARY_NODE_ADDRESS}) from this uninitialized node"
+    gluster peer detach "$PRIMARY_NODE_ADDRESS" force >/dev/null
+    systemctl restart glusterd
+    systemctl --quiet is-active glusterd || die 'glusterd did not return after removing the stale peer'
+    log 'Stale rejected peer removed; waiting for the primary to probe this node again'
 }
 
 ensure_volume_started() {
@@ -109,6 +143,11 @@ mount_volume() {
 }
 
 case "$action" in
+    prepare-join)
+        [[ "$NODE_ROLE" == data && "$NODE_NAME" == "$SECONDARY_NODE_NAME" ]] || \
+            die 'prepare-join must run on the secondary data node'
+        repair_fresh_rejected_peer
+        ;;
     bootstrap)
         [[ "$NODE_ROLE" == data ]] || die 'Bootstrap must run on a data node'
         [[ "$NODE_NAME" == "$PRIMARY_NODE_NAME" ]] || die 'Bootstrap must run on PRIMARY_NODE_NAME'
@@ -157,6 +196,7 @@ case "$action" in
         ;;
     join)
         [[ "$NODE_ROLE" == data ]] || die 'Join must run on a data node'
+        repair_fresh_rejected_peer
         mount_volume --wait-for-volume
         docker pull -q "$MARIADB_IMAGE" >/dev/null
         start_database
@@ -238,5 +278,5 @@ case "$action" in
         systemctl enable --now glusterd
         systemctl enable --now garb
         ;;
-    *) echo "Usage: $0 bootstrap | join [--token-stdin] | clear-bootstrap-flag | enable-node HOSTNAME | status | restore-quorum | clear-cache --all-nodes-drained | start-arbitrator" >&2; exit 2 ;;
+    *) echo "Usage: $0 prepare-join | bootstrap | join [--token-stdin] | clear-bootstrap-flag | enable-node HOSTNAME | status | restore-quorum | clear-cache --all-nodes-drained | start-arbitrator" >&2; exit 2 ;;
 esac

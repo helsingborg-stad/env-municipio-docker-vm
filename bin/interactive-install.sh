@@ -288,6 +288,10 @@ cluster_next_steps() {
             fi
             ;;
         secondary)
+            # Repair only the harmless, incomplete-installation Gluster state before
+            # asking whether to join. The command refuses once data or a completed
+            # cluster exists, so a normal resume never discards cluster state.
+            /scripts/cluster.municipio.sh prepare-join
             yes_no 'Has the cluster been started on website server 1, and should this server connect now?' no
             if [[ "$REPLY" == yes ]]; then
                 if [[ "$docker_swarm" == 1 ]]; then

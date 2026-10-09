@@ -56,6 +56,20 @@ if command -v gluster >/dev/null 2>&1; then
     systemctl disable --now glusterd 2>/dev/null
 fi
 
+# glusterfs-server's post-removal hook tries to delete the `gluster` group. On
+# some Ubuntu releases it fails when a stale `gluster` user remains, leaving the
+# package half-purged and its hooks behind. No Gluster service is running now,
+# and this uninstaller explicitly destroys all Gluster state, so remove both
+# the state and the service account before asking dpkg to purge the package.
+echo '>> Removing GlusterFS state and service account'
+rm -rf /var/lib/glusterd /etc/glusterfs /var/log/glusterfs
+if getent passwd gluster >/dev/null; then
+    userdel gluster 2>/dev/null || echo '   Could not remove stale gluster user; package purge will retry it' >&2
+fi
+if getent group gluster >/dev/null; then
+    groupdel gluster 2>/dev/null || echo '   Could not remove stale gluster group; package purge will retry it' >&2
+fi
+
 echo '>> Removing files and directories'
 rm -rf /scripts /usr/local/lib/municipio "$INSTALL_ROOT" "$CONFIG_ROOT" /var/lib/municipio \
     "$DATA_ROOT" "$GLUSTER_BRICK" /srv/municipio "$BACKUP_ROOT" /etc/default/garb /var/log/garb.log
@@ -70,7 +84,22 @@ for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-com
     galera-arbitrator-4; do
     dpkg-query -W -f '${Status}' "$pkg" 2>/dev/null | grep -q 'ok installed' && installed+=("$pkg")
 done
-((${#installed[@]} == 0)) || apt-get purge -y "${installed[@]}"
+if ((${#installed[@]})); then
+    if ! apt-get purge -y "${installed[@]}"; then
+        # A previous interrupted purge can leave the service account behind. It
+        # is safe to retry here because all Gluster state and services were
+        # removed above, and the requested operation is a full uninstall.
+        echo '>> Retrying package purge after GlusterFS cleanup' >&2
+        if getent passwd gluster >/dev/null; then
+            userdel gluster 2>/dev/null || true
+        fi
+        if getent group gluster >/dev/null; then
+            groupdel gluster 2>/dev/null || true
+        fi
+        apt-get purge -y "${installed[@]}" || \
+            echo '   WARNING: package purge still failed; inspect the APT output above and re-run this uninstaller.' >&2
+    fi
+fi
 apt-get autoremove --purge -y
 # Deleted only once no installed package owns them: dpkg treats a removed conffile as
 # the admin's choice and never restores it, so a later reinstall would start without

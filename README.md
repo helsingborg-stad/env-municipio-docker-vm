@@ -63,4 +63,4 @@ sudo sh uninstaller.sh        # asks for confirmation; --yes skips it
 sudo reboot
 ```
 
-It removes the containers, Swarm membership, systemd units, firewall rules, Gluster volume, every Municipio directory, and Docker Engine with all of its data. The database, uploads and backups under `BACKUP_ROOT` are deleted, so copy anything you need off the VM first. Docker Engine is removed even if it was present before the install. Base packages such as `curl`, `tar` and `rsync` are kept. In cluster modes, run it on every node, including the arbitrator.
+It removes the containers, Swarm membership, systemd units, firewall rules, Gluster volume and metadata, every Municipio directory, and Docker Engine with all of its data. The database, uploads and backups under `BACKUP_ROOT` are deleted, so copy anything you need off the VM first. Docker Engine is removed even if it was present before the install. Base packages such as `curl`, `tar` and `rsync` are kept. In cluster modes, run it on every node, including the arbitrator.

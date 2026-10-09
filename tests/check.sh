@@ -145,6 +145,8 @@ grep -Fq 'Usage: update.municipio.sh [municipio [VERSION]]' scripts/update.munic
 grep -Fq "version=\"\${2:-latest}\"" scripts/update.municipio.sh
 grep -Fq 'resolved to an immutable digest' scripts/update.municipio.sh
 grep -Fq '15 3 * * 1 /scripts/update.municipio.sh municipio latest' docs/runbook.md
+grep -Fq 'Update installed Municipio scripts and system files' docs/runbook.md
+grep -Fq 'Confirm the prompt to continue the saved installation' docs/runbook.md
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.namedotcom' scripts/refresh-sites.municipio.sh

@@ -30,6 +30,16 @@ If an earlier run saved `/etc/municipio/municipio.env` but did not finish, run t
 
 Running the installer on a server installed by an older version works the same way. When the saved file lacks settings the current installer writes, it lists them and, after confirmation, adds only those: path and other defaults are copied from `.env.example`, and the [ACME DNS-01](configuration.md#acme-dns-01) choice is asked on a data server whose Caddy manages TLS (an arbiter, or a server behind upstream TLS, gets `ACME_DNS_PROVIDER=none`). Existing values are never changed, except that choosing DNS-01 replaces `CADDY_IMAGE` with the installer's own Caddy image, which includes the DNS modules. The installer pulls it and checks for the provider's module first, and stops without changes if it is missing. The merged file is validated before anything is changed, the previous file is kept as `/etc/municipio/municipio.env.<timestamp>.bak`, and the installation then runs again. A running Galera node is left running. In a cluster, update both website servers with the same answers, because they share Caddy's certificate storage. Choosing DNS-01 recreates the Caddy container, so expect a short interruption on ports 80 and 443; update one server at a time. If the installation still fails after the settings were saved, restore the `.bak` file over `municipio.env` and run the installer again to be asked once more. The lower-level `bin/install.sh --env-file` remains available for carefully reviewed reconfiguration from a local checkout; it is not the normal installation path.
 
+### Update installed Municipio scripts and system files
+
+To install the latest published installer files (such as maintenance scripts, systemd units and Compose files) without resetting Municipio data or saved settings, download and run the installer again:
+
+```bash
+curl -fsSL https://install.getmunicipio.com/installer.sh | sudo sh
+```
+
+Confirm the prompt to continue the saved installation. The installer downloads a temporary copy of the latest source bundle and replaces the installed runtime files; it keeps `/etc/municipio/municipio.env`, MariaDB data, uploads and backups. In a two-server cluster, complete the update on one website server before running it on the other, then verify both with `sudo /scripts/status.municipio.sh`. The new version must already be published to the `main` branch for this command to retrieve it.
+
 ## Initialize a two-node cluster
 
 Run the wizard on both data VMs first. Use the same OS release for both data VMs and the arbitrator; GlusterFS comes from the distribution. Choose the same number of servers and the same advanced settings, and enter identical shared settings, **including the cluster password and the WordPress password**. Use the correct node-specific name/address on each VM. The secondary should be prepared before bootstrapping the primary.

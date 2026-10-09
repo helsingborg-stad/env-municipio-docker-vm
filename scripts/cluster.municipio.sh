@@ -6,11 +6,31 @@ source /usr/local/lib/municipio/common.sh
 load_config
 [[ "$DEPLOYMENT_MODE" != standalone ]] || die 'Cluster commands are unavailable in standalone mode'
 action="${1:-status}"
+CLUSTER_START_WAIT_SECONDS=60
+
+wait_for_peer() {
+    local address="$1" started=$SECONDS probe_error
+    log "Waiting up to ${CLUSTER_START_WAIT_SECONDS}s for Gluster peer $address"
+    while ! probe_error="$(gluster peer probe "$address" 2>&1)"; do
+        (( SECONDS - started >= CLUSTER_START_WAIT_SECONDS )) && \
+            die "Gluster peer $address did not become available within ${CLUSTER_START_WAIT_SECONDS}s. Last reply: ${probe_error}. Check that glusterd is active on the other server and that the Gluster ports are reachable."
+        sleep 2
+    done
+}
 
 mount_volume() {
     grep -qE "^[^#]+[[:space:]]+${DATA_ROOT//\//\\/}[[:space:]]" /etc/fstab || \
         echo "localhost:/municipio ${DATA_ROOT} glusterfs defaults,_netdev,backupvolfile-server=${SECONDARY_NODE_ADDRESS} 0 0" >> /etc/fstab
-    mountpoint -q "$DATA_ROOT" || mount "$DATA_ROOT"
+    # The secondary can reach this point while the primary is still creating the
+    # volume. Retrying the local mount gives Gluster time to receive that volume
+    # definition instead of making a simultaneous wizard run fail spuriously.
+    local started=$SECONDS
+    log "Waiting up to ${CLUSTER_START_WAIT_SECONDS}s for Gluster volume municipio to mount"
+    until mountpoint -q "$DATA_ROOT" || timeout 5 mount "$DATA_ROOT"; do
+        (( SECONDS - started >= CLUSTER_START_WAIT_SECONDS )) && \
+            die "Gluster volume municipio did not mount within ${CLUSTER_START_WAIT_SECONDS}s. Check the primary bootstrap and run gluster peer status on both servers."
+        sleep 2
+    done
     [[ "$(findmnt -no FSTYPE --target "$DATA_ROOT")" == fuse.glusterfs ]] || \
         die "DATA_ROOT is not a Gluster mount: $DATA_ROOT"
     findmnt -no OPTIONS --target "$DATA_ROOT" | tr ',' '\n' | grep -qx rw || \
@@ -23,9 +43,9 @@ case "$action" in
     bootstrap)
         [[ "$NODE_ROLE" == data ]] || die 'Bootstrap must run on a data node'
         [[ "$NODE_NAME" == "$PRIMARY_NODE_NAME" ]] || die 'Bootstrap must run on PRIMARY_NODE_NAME'
-        gluster peer probe "$SECONDARY_NODE_ADDRESS"
+        wait_for_peer "$SECONDARY_NODE_ADDRESS"
         if [[ "$DEPLOYMENT_MODE" == cluster-arbitrator ]]; then
-            gluster peer probe "$ARBITRATOR_NODE_ADDRESS"
+            wait_for_peer "$ARBITRATOR_NODE_ADDRESS"
             gluster volume info municipio >/dev/null 2>&1 || gluster --mode=script volume create municipio replica 2 arbiter 1 \
                 "${PRIMARY_NODE_ADDRESS}:${GLUSTER_BRICK}" \
                 "${SECONDARY_NODE_ADDRESS}:${GLUSTER_BRICK}" \

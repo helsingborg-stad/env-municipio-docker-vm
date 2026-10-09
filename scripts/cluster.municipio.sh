@@ -9,21 +9,23 @@ action="${1:-status}"
 CLUSTER_START_WAIT_SECONDS=60
 
 wait_for_peer() {
-    local address="$1" name="$2" started=$SECONDS probe_error attempt=0
+    local address="$1" name="$2" started=$SECONDS probe_error peer_status attempt=0 probe_accepted=false
     log "Waiting up to ${CLUSTER_START_WAIT_SECONDS}s for Gluster peer ${name} (${address}) from ${NODE_NAME} (${NODE_ADDRESS})"
     while :; do
-        # A successful probe has completed the peer handshake. Do not wait for
-        # `peer status` to render the peer's configured hostname before creating
-        # the volume; hostname rendering differs between Gluster releases.
         peer_is_connected "$address" "$name" && return 0
-        ((attempt += 1))
-        if probe_error="$(gluster peer probe "$address" 2>&1)"; then
-            log "Gluster peer probe to ${name} (${address}) succeeded on attempt ${attempt}"
-            return 0
+        if [[ "$probe_accepted" == false ]]; then
+            ((attempt += 1))
+            if probe_error="$(gluster peer probe "$address" 2>&1)"; then
+                probe_accepted=true
+                log "Gluster peer probe to ${name} (${address}) succeeded on attempt ${attempt}; waiting for Peer in Cluster (Connected)"
+            else
+                log "Gluster peer probe to ${name} (${address}) failed on attempt ${attempt}: ${probe_error}"
+            fi
         fi
-        log "Gluster peer probe to ${name} (${address}) failed on attempt ${attempt}: ${probe_error}"
-        (( SECONDS - started >= CLUSTER_START_WAIT_SECONDS )) && \
-            die "Gluster peer $address did not become available within ${CLUSTER_START_WAIT_SECONDS}s. Last reply: ${probe_error}. Check that glusterd is active on the other server and that the Gluster ports are reachable."
+        if (( SECONDS - started >= CLUSTER_START_WAIT_SECONDS )); then
+            peer_status="$(timeout 5 gluster peer status 2>&1 || true)"
+            die "Gluster peer ${name} (${address}) did not reach Peer in Cluster (Connected) within ${CLUSTER_START_WAIT_SECONDS}s. Last probe reply: ${probe_error:-accepted}; peer status: $(tr '\n' ' ' <<<"$peer_status")"
+        fi
         sleep 2
     done
 }

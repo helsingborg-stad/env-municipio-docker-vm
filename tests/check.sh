@@ -125,6 +125,8 @@ grep -Fq "install -d -m 0700 \"\$DATA_ROOT/caddy\"" scripts/cluster.municipio.sh
 grep -Fq 'CLUSTER_START_WAIT_SECONDS=60' scripts/cluster.municipio.sh
 grep -Fq 'peer_is_connected()' scripts/cluster.municipio.sh
 grep -Fq 'ensure_volume_started()' scripts/cluster.municipio.sh
+grep -Fq "Gluster peer probe to \${name} (\${address}) failed on attempt" scripts/cluster.municipio.sh
+grep -Fq "Gluster mount attempt \${attempt} on \${NODE_NAME} (\${NODE_ADDRESS}) failed" scripts/cluster.municipio.sh
 grep -Fq "Waiting up to \${CLUSTER_START_WAIT_SECONDS}s for Gluster peer" scripts/cluster.municipio.sh
 grep -Fq 'mount_volume --wait-for-volume' scripts/cluster.municipio.sh
 grep -Fq "Waiting up to \${CLUSTER_START_WAIT_SECONDS}s for Gluster volume municipio to mount" scripts/cluster.municipio.sh

@@ -9,16 +9,19 @@ action="${1:-status}"
 CLUSTER_START_WAIT_SECONDS=60
 
 wait_for_peer() {
-    local address="$1" name="$2" started=$SECONDS probe_error
-    log "Waiting up to ${CLUSTER_START_WAIT_SECONDS}s for Gluster peer $address"
+    local address="$1" name="$2" started=$SECONDS probe_error attempt=0
+    log "Waiting up to ${CLUSTER_START_WAIT_SECONDS}s for Gluster peer ${name} (${address}) from ${NODE_NAME} (${NODE_ADDRESS})"
     while :; do
         # A successful probe has completed the peer handshake. Do not wait for
         # `peer status` to render the peer's configured hostname before creating
         # the volume; hostname rendering differs between Gluster releases.
         peer_is_connected "$address" "$name" && return 0
+        ((attempt += 1))
         if probe_error="$(gluster peer probe "$address" 2>&1)"; then
+            log "Gluster peer probe to ${name} (${address}) succeeded on attempt ${attempt}"
             return 0
         fi
+        log "Gluster peer probe to ${name} (${address}) failed on attempt ${attempt}: ${probe_error}"
         (( SECONDS - started >= CLUSTER_START_WAIT_SECONDS )) && \
             die "Gluster peer $address did not become available within ${CLUSTER_START_WAIT_SECONDS}s. Last reply: ${probe_error}. Check that glusterd is active on the other server and that the Gluster ports are reachable."
         sleep 2
@@ -46,23 +49,32 @@ ensure_volume_started() {
 
 mount_volume() {
     local wait_for_volume="${1:-}"
+    local mount_error attempt=0
     [[ -z "$wait_for_volume" || "$wait_for_volume" == --wait-for-volume ]] || \
         die 'mount_volume accepts only --wait-for-volume'
     grep -qE "^[^#]+[[:space:]]+${DATA_ROOT//\//\\/}[[:space:]]" /etc/fstab || \
         echo "localhost:/municipio ${DATA_ROOT} glusterfs defaults,_netdev,backupvolfile-server=${SECONDARY_NODE_ADDRESS} 0 0" >> /etc/fstab
+    log "Gluster mount on ${NODE_NAME} (${NODE_ADDRESS}): localhost:/municipio -> ${DATA_ROOT}; backup server ${SECONDARY_NODE_ADDRESS}"
     if [[ "$wait_for_volume" == --wait-for-volume ]]; then
         # The secondary can reach this point while the primary is still creating the
         # volume. Retrying here gives Gluster time to receive that definition instead
         # of making a simultaneous wizard run fail spuriously.
         local started=$SECONDS
         log "Waiting up to ${CLUSTER_START_WAIT_SECONDS}s for Gluster volume municipio to mount"
-        until mountpoint -q "$DATA_ROOT" || timeout 5 mount "$DATA_ROOT"; do
+        while ! mountpoint -q "$DATA_ROOT"; do
+            ((attempt += 1))
+            if mount_error="$(timeout 5 mount "$DATA_ROOT" 2>&1)"; then
+                break
+            fi
+            log "Gluster mount attempt ${attempt} on ${NODE_NAME} (${NODE_ADDRESS}) failed: ${mount_error}"
             (( SECONDS - started >= CLUSTER_START_WAIT_SECONDS )) && \
                 die "Gluster volume municipio did not mount within ${CLUSTER_START_WAIT_SECONDS}s. Check the primary bootstrap and run gluster peer status on both servers."
             sleep 2
         done
     else
-        mountpoint -q "$DATA_ROOT" || mount "$DATA_ROOT"
+        if ! mountpoint -q "$DATA_ROOT" && ! mount_error="$(mount "$DATA_ROOT" 2>&1)"; then
+            die "Gluster mount on ${NODE_NAME} (${NODE_ADDRESS}) failed: ${mount_error}"
+        fi
     fi
     [[ "$(findmnt -no FSTYPE --target "$DATA_ROOT")" == fuse.glusterfs ]] || \
         die "DATA_ROOT is not a Gluster mount: $DATA_ROOT"

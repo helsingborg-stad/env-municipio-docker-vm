@@ -231,7 +231,18 @@ caddy_image_has_dns_module() {
 default_value() { sed -n "s/^$1=//p" "$ROOT_DIR/.env.example"; }
 # Settings the wizard does not ask about but must still write out verbatim. Kept on one
 # assignment so that tests/check.sh can read the list without parsing shell control flow.
-COPIED_DEFAULT_NAMES='CONFIG_ROOT INSTALL_ROOT DATA_ROOT DB_DATA_ROOT DB_SOCKET_DIR DB_SOCKET_UID DB_SOCKET_GID GLUSTER_BRICK BACKUP_ROOT HEALTH_ROOT DB_HOST DB_TABLE_PREFIX APP_BIND_ADDRESS APP_BIND_PORT WP_SITE_TITLE WP_DEBUG WP_REDIS_DISABLED'
+COPIED_DEFAULT_NAMES='CONFIG_ROOT INSTALL_ROOT DATA_ROOT DB_DATA_ROOT DB_SOCKET_DIR DB_SOCKET_UID DB_SOCKET_GID GLUSTER_BRICK BACKUP_ROOT HEALTH_ROOT DB_HOST DB_TABLE_PREFIX APP_BIND_ADDRESS APP_BIND_PORT WP_SITE_TITLE WP_DEBUG'
+
+# Redis is provided inside the Municipio container. It is a local cache and therefore
+# belongs only to standalone mode; clustered data nodes share their file cache through
+# GlusterFS but do not run Redis as a Redis cluster.
+redis_disabled_for_mode() {
+    [[ "$1" == standalone ]] && printf false || printf true
+}
+
+write_redis_mode() {
+    printf "WP_REDIS_DISABLED='%s'\n" "$(redis_disabled_for_mode "$deployment_mode")" >> "$config_file"
+}
 
 # Every setting a fresh installation writes: the write_value lines below plus the copied
 # defaults, read the same way tests/check.sh reads them.
@@ -659,6 +670,7 @@ write_value DB_ROOT_PASSWORD "$db_root_password"
 write_value WP_ADMIN_USER "$wp_admin_user"
 write_value WP_ADMIN_PASSWORD "$wp_admin_password"
 write_value WP_ADMIN_EMAIL "$wp_admin_email"
+write_redis_mode
 
 # The generated file has to be self-contained. Docker Compose reads it directly and
 # applies none of the defaults that validate_config fills in for the shell, so an

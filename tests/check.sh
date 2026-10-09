@@ -158,6 +158,11 @@ grep -Fq 'Do **not** use `gluster peer detach` as a failover mechanism' docs/fai
 grep -Fq 'trap remove_marker_on_failure EXIT' scripts/health.municipio.sh
 grep -Fq 'curl -fsS --max-time 15' scripts/health.municipio.sh
 grep -Fq 'TimeoutStartSec=25s' systemd/municipio-health.service
+grep -Fq 'WP_REDIS_DISABLED=false' .env.example
+grep -Fq "WP_CONF_WP_REDIS_DISABLED: \${WP_REDIS_DISABLED:-true}" compose.yaml
+grep -Fq "WP_CONF_WP_REDIS_DISABLED: \${WP_REDIS_DISABLED:-true}" compose.swarm.yaml
+grep -Fq 'redis_disabled_for_mode()' bin/interactive-install.sh
+grep -Fq 'write_redis_mode' bin/interactive-install.sh
 grep -Fq 'external high-availability checker must also reject a stale marker' docs/components/proxy-health.md
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh
@@ -199,6 +204,7 @@ for scenario in manual-primary manual-secondary arbitrator-primary arbitrator-se
         *-witness) role=arbiter name=municipio-arbiter address=10.20.0.13 ;;
     esac
     sed -e "s/^DEPLOYMENT_MODE=.*/DEPLOYMENT_MODE=$mode/" \
+        -e 's/^WP_REDIS_DISABLED=.*/WP_REDIS_DISABLED=true/' \
         -e "s/^NODE_ROLE=.*/NODE_ROLE=$role/" \
         -e "s/^NODE_NAME=.*/NODE_NAME=$name/" \
         -e "s/^NODE_ADDRESS=.*/NODE_ADDRESS=$address/" \

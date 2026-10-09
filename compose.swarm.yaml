@@ -16,6 +16,9 @@ services:
       WP_CONF_WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD}
       WP_CONF_WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
       WP_CONF_WP_DEBUG: ${WP_DEBUG:-false}
+      # New environment files set this explicitly: enabled on standalone,
+      # disabled on shared-filesystem cluster nodes. Keep the old safe default for
+      # legacy environment files, which an installer re-run must not rewrite.
       WP_CONF_WP_REDIS_DISABLED: ${WP_REDIS_DISABLED:-true}
     ports:
       - target: 80

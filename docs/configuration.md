@@ -91,6 +91,13 @@ The local `NODE_NAME` and `NODE_ADDRESS` must match the primary, secondary, or a
 
 `APP_BIND_ADDRESS` must remain `127.0.0.1`; the application port is for local Caddy only.
 
+`WP_REDIS_DISABLED` is managed by the installer and is not normally an advanced setting.
+The Municipio image contains Redis: it is set to `false` (enabled) for `standalone`, where
+the cache is local to that VM. It is set to `true` (disabled) for both cluster modes, because
+Redis itself is not configured as a cluster. The value is chosen only when creating a new
+environment file; re-running the installer preserves an existing
+`/etc/municipio/municipio.env` unchanged.
+
 `DB_SOCKET_DIR` is deliberately not under `/run`. That is a tmpfs, so the directory would be gone after a reboot and the database container would start with nowhere to create its socket.
 
 `DB_SOCKET_UID` and `DB_SOCKET_GID` default to `999` and must match the `mysql` user inside `MARIADB_IMAGE`. The installer verifies them against the running container and refuses a mismatch rather than leaving a socket the application cannot use.

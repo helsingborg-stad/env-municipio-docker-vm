@@ -59,6 +59,17 @@ validate_config() {
         standalone|cluster-manual|cluster-arbitrator) ;;
         *) die "DEPLOYMENT_MODE must be standalone, cluster-manual or cluster-arbitrator" ;;
     esac
+    # Redis runs inside the Municipio image. The installer writes the appropriate
+    # value into the Compose environment: enabled locally for standalone, disabled
+    # where the WordPress cache directory is shared through GlusterFS in a cluster.
+    if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
+        : "${WP_REDIS_DISABLED:=false}"
+    else
+        : "${WP_REDIS_DISABLED:=true}"
+    fi
+    [[ "$WP_REDIS_DISABLED" == true || "$WP_REDIS_DISABLED" == false ]] || \
+        die 'WP_REDIS_DISABLED must be true or false'
+    export WP_REDIS_DISABLED
     case "$NODE_ROLE" in data|arbiter) ;; *) die "NODE_ROLE must be data or arbiter" ;; esac
     [[ "$NODE_ROLE" != arbiter || "$DEPLOYMENT_MODE" == cluster-arbitrator ]] || \
         die 'NODE_ROLE=arbiter requires cluster-arbitrator mode'

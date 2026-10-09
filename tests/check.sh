@@ -123,7 +123,10 @@ grep -Fq 'systemctl enable municipio-caddy.service' scripts/install/maintenance.
 grep -Fq "tar -C \"\$DATA_ROOT\" -czf \"\$target/files.tar.gz\" uploads cache caddy" scripts/backup.municipio.sh
 grep -Fq "install -d -m 0700 \"\$DATA_ROOT/caddy\"" scripts/cluster.municipio.sh
 grep -Fq 'CLUSTER_START_WAIT_SECONDS=60' scripts/cluster.municipio.sh
+grep -Fq 'peer_is_connected()' scripts/cluster.municipio.sh
+grep -Fq 'ensure_volume_started()' scripts/cluster.municipio.sh
 grep -Fq "Waiting up to \${CLUSTER_START_WAIT_SECONDS}s for Gluster peer" scripts/cluster.municipio.sh
+grep -Fq 'mount_volume --wait-for-volume' scripts/cluster.municipio.sh
 grep -Fq "Waiting up to \${CLUSTER_START_WAIT_SECONDS}s for Gluster volume municipio to mount" scripts/cluster.municipio.sh
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh

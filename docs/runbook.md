@@ -34,7 +34,7 @@ Running the installer on a server installed by an older version works the same w
 
 Run the wizard on both data VMs first. Use the same OS release for both data VMs and the arbitrator; GlusterFS comes from the distribution. Choose the same number of servers and the same advanced settings, and enter identical shared settings, **including the cluster password and the WordPress password**. Use the correct node-specific name/address on each VM. The secondary should be prepared before bootstrapping the primary.
 
-The primary waits up to 60 seconds for the secondary's Gluster service, and the secondary waits up to 60 seconds for the new Gluster volume to become mountable. You may therefore confirm the two wizard prompts close together; they no longer need manual timing. If either wait expires, leave both installations in place, check `sudo systemctl status glusterd` and the cluster firewall on both VMs, then run the relevant `bootstrap` or `join` command again. Do not create a Gluster volume manually on the secondary.
+The primary waits up to 60 seconds for the secondary's Gluster service, and the secondary waits up to 60 seconds for the new Gluster volume to become mountable. You may therefore confirm the two wizard prompts close together; they no longer need manual timing. `bootstrap` and `join` are safe to run again after an interrupted setup: they accept an already connected peer, reuse the existing `municipio` volume and verify that it is started. If either wait expires, leave both installations in place, check `sudo systemctl status glusterd` and the cluster firewall on both VMs, then run the relevant command again. Do not create a Gluster volume manually on the secondary.
 
 On the preferred node only:
 

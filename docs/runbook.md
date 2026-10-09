@@ -133,6 +133,21 @@ Add this line:
 
 Review the result after each run with `sudo tail -n 100 /var/log/municipio-update.log` and `sudo /scripts/status.municipio.sh`. In Compose cluster mode, schedule the job on only one data VM at a time, verify it, then schedule the other VM at a different time; do not update both nodes simultaneously. In Swarm mode, schedule it only on the manager. Ensure the VM has enough free space for the pre-update backup and the newly pulled image.
 
+## Patch and reboot a cluster
+
+Apply automatic operating-system patches and reboots to **one node at a time**. Never schedule both data VMs for the same reboot window: if both Galera nodes are down together, no node automatically chooses a safe new primary component and manual recovery may be required.
+
+For a two-data-node cluster, patch and reboot the secondary first. Wait for it to return, then verify from both servers:
+
+```bash
+sudo /scripts/status.municipio.sh
+sudo /scripts/monitor.municipio.sh
+```
+
+Before rebooting the primary, confirm that the secondary's Gluster mount is read/write, both Gluster peers and bricks are connected, and Galera reports two data nodes. Only then patch and reboot the primary. Leave at least 20–30 minutes between independently scheduled reboot windows; a health-gated scheduler is preferable to a fixed delay. With Docker Swarm, reboot the worker/secondary first and the manager/primary last. In an arbitrator deployment, reboot the arbitrator only after both data VMs are healthy.
+
+After each reboot, Caddy intentionally stays unavailable until the local Gluster mount is read/write, preventing it from using the hidden local directory below an unavailable mount. A returning node normally reconnects to Galera and Gluster automatically. Do not reboot a node while `status.municipio.sh` reports `galera_bootstrap=ACTIVE`; complete the [manual failover recovery](failover.md#reattach-a-returning-server) first.
+
 ## Update the MariaDB or Caddy image
 
 Deliberately not automated, and deliberately not part of an application update.

@@ -148,6 +148,8 @@ grep -Fq 'resolved to an immutable digest' scripts/update.municipio.sh
 grep -Fq '15 3 * * 1 /scripts/update.municipio.sh municipio latest' docs/runbook.md
 grep -Fq 'Update installed Municipio scripts and system files' docs/runbook.md
 grep -Fq 'Confirm the prompt to continue the saved installation' docs/runbook.md
+grep -Fq '## Patch and reboot a cluster' docs/runbook.md
+grep -Fq 'Never schedule both data VMs for the same reboot window' docs/runbook.md
 grep -Fq 'Detach a surviving server from a dead replica and restore writes' docs/failover.md
 grep -Fq 'Reattach a returning server and restore the cluster' docs/failover.md
 grep -Fq 'Do **not** use `gluster peer detach` as a failover mechanism' docs/failover.md

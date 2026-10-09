@@ -15,6 +15,9 @@ install -d -o "$DB_SOCKET_UID" -g "$DB_SOCKET_GID" -m 0755 "$DB_SOCKET_DIR"
 
 if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
     install -d -o 1000 -g 1000 -m 0755 "${DATA_ROOT}/uploads" "${DATA_ROOT}/cache"
+    # OpenLiteSpeed runs as lsadm (994) and stores its rendered page cache here.
+    # DATA_ROOT is Gluster-backed in cluster mode, so this cache is replicated too.
+    install -d -o 994 -g 994 -m 0755 "${DATA_ROOT}/cache/litespeed"
     install -d -m 0700 "${DATA_ROOT}/caddy"
 else
     install -d -m 0750 "${GLUSTER_BRICK}" "${DATA_ROOT}"

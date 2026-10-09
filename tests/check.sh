@@ -130,8 +130,8 @@ grep -Fq 'repair_fresh_rejected_peer()' scripts/cluster.municipio.sh
 grep -Fq 'Removing stale rejected Gluster peer' scripts/cluster.municipio.sh
 grep -Fq 'prepare-join)' scripts/cluster.municipio.sh
 grep -Fq '/scripts/cluster.municipio.sh prepare-join' bin/interactive-install.sh
-grep -Fq 'wait_for_peer "$local_join_peer_address" "$local_join_peer_name"' scripts/cluster.municipio.sh
-grep -Fq 'local_join_peer_address="$SECONDARY_NODE_ADDRESS"' scripts/cluster.municipio.sh
+grep -Fq "wait_for_peer \"\$local_join_peer_address\" \"\$local_join_peer_name\"" scripts/cluster.municipio.sh
+grep -Fq "local_join_peer_address=\"\$SECONDARY_NODE_ADDRESS\"" scripts/cluster.municipio.sh
 grep -Fq "getent ahostsv4 \"\$host\"" scripts/cluster.municipio.sh
 grep -Fq 'ensure_volume_started()' scripts/cluster.municipio.sh
 grep -Fq 'waiting for Peer in Cluster (Connected)' scripts/cluster.municipio.sh
@@ -154,7 +154,7 @@ grep -Fq '## Patch and reboot a cluster' docs/runbook.md
 grep -Fq 'Never schedule both data VMs for the same reboot window' docs/runbook.md
 grep -Fq 'Detach a surviving server from a dead replica and restore writes' docs/failover.md
 grep -Fq 'Reattach a returning server and restore the cluster' docs/failover.md
-grep -Fq 'Do **not** use `gluster peer detach` as a failover mechanism' docs/failover.md
+grep -Fq "Do **not** use \`gluster peer detach\` as a failover mechanism" docs/failover.md
 grep -Fq 'trap remove_marker_on_failure EXIT' scripts/health.municipio.sh
 grep -Fq 'curl -fsS --max-time 15' scripts/health.municipio.sh
 grep -Fq 'TimeoutStartSec=25s' systemd/municipio-health.service
@@ -163,6 +163,12 @@ grep -Fq "WP_CONF_WP_REDIS_DISABLED: \${WP_REDIS_DISABLED:-true}" compose.yaml
 grep -Fq "WP_CONF_WP_REDIS_DISABLED: \${WP_REDIS_DISABLED:-true}" compose.swarm.yaml
 grep -Fq 'redis_disabled_for_mode()' bin/interactive-install.sh
 grep -Fq 'write_redis_mode' bin/interactive-install.sh
+grep -Fq 'ENABLE_LS_CACHE: "true"' compose.yaml
+grep -Fq 'ENABLE_LS_CACHE: "true"' compose.swarm.yaml
+grep -Fq 'cache/litespeed:/usr/local/lsws/cachedata' compose.yaml
+grep -Fq 'target: /usr/local/lsws/cachedata' compose.swarm.yaml
+grep -Fq "install -d -o 994 -g 994 -m 0755 \"\${DATA_ROOT}/cache/litespeed\"" scripts/install/storage.sh
+grep -Fq "install -d -o 994 -g 994 -m 0755 \"\$DATA_ROOT/cache/litespeed\"" scripts/cluster.municipio.sh
 grep -Fq 'external high-availability checker must also reject a stale marker' docs/components/proxy-health.md
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh

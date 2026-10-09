@@ -6,7 +6,12 @@ Keep uploads, requested cache directories, and Caddy certificate storage availab
 
 ## Standalone solution
 
-The installer creates `/srv/municipio/data/uploads`, `/srv/municipio/data/cache`, and `/srv/municipio/data/caddy` on the VM's existing filesystem. Caddy mounts the last directory at `/data` for certificates and ACME state.
+The installer creates `/srv/municipio/data/uploads`, `/srv/municipio/data/cache`,
+`/srv/municipio/data/cache/litespeed`, and `/srv/municipio/data/caddy` on the VM's
+existing filesystem. Caddy mounts the last directory at `/data` for certificates and
+ACME state. The Municipio container mounts `cache/litespeed` at OpenLiteSpeed's
+`/usr/local/lsws/cachedata`, so LiteSpeed Page Cache is persistent locally and replicated
+by GlusterFS in cluster modes.
 
 Docker bind-mounts them into the container. “Mount” here does not mean an external storage service.
 

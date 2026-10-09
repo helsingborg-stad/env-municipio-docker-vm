@@ -14,6 +14,11 @@ The container reaches MariaDB through a read-only bind mount of `DB_SOCKET_DIR` 
 
 Persistent writable paths are bind-mounted from `DATA_ROOT`.
 
+LiteSpeed Page Cache is enabled in both standalone and cluster modes with
+`ENABLE_LS_CACHE=true`. Its OpenLiteSpeed cache directory is mounted from
+`DATA_ROOT/cache/litespeed`; on a cluster that is the GlusterFS view, so every data VM
+uses the replicated page-cache directory. This is separate from Redis object caching.
+
 The deployment does not replace the image's WordPress configuration. Municipio's force-SSL plugin handles HTTP references to public content, while `WP_HOME` and `WP_SITEURL` are configured with the public HTTPS address.
 
 In Compose mode, `update.municipio.sh` drains the local node, takes a backup, replaces only its application container, verifies health, and returns the node to service. Every application-level `compose up` passes `--no-deps`, so an application deployment can never recreate the database container — that would drop a Galera bootstrap flag or interrupt replication. In Swarm mode, run the command once on the manager: it updates the shared global service one task at a time across the data VMs.

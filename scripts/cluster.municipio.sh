@@ -139,6 +139,7 @@ mount_volume() {
     findmnt -no OPTIONS --target "$DATA_ROOT" | tr ',' '\n' | grep -qx rw || \
         die "DATA_ROOT is read-only: $DATA_ROOT"
     install -d -o 1000 -g 1000 -m 0755 "$DATA_ROOT/uploads" "$DATA_ROOT/cache"
+    install -d -o 994 -g 994 -m 0755 "$DATA_ROOT/cache/litespeed"
     install -d -m 0700 "$DATA_ROOT/caddy"
 }
 
@@ -285,6 +286,7 @@ case "$action" in
     clear-cache)
         [[ "${2:-}" == --all-nodes-drained ]] || die 'Refusing shared cache deletion without --all-nodes-drained'
         find "${DATA_ROOT:?}/cache" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+        install -d -o 994 -g 994 -m 0755 "$DATA_ROOT/cache/litespeed"
         ;;
     start-arbitrator)
         [[ "$NODE_ROLE" == arbiter ]] || die 'start-arbitrator must run on the arbitrator host'

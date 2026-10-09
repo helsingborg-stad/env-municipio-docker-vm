@@ -90,6 +90,7 @@ fi
 
 if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
     find "${DATA_ROOT:?}/cache" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+    install -d -o 994 -g 994 -m 0755 "${DATA_ROOT}/cache/litespeed"
 else
     log 'Shared cache was not cleared; clear it once after every node runs the same digest'
 fi

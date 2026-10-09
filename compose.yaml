@@ -80,6 +80,9 @@ services:
       WP_CONF_WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD}
       WP_CONF_WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
       WP_CONF_WP_DEBUG: ${WP_DEBUG:-false}
+      # LiteSpeed Page Cache is independent of Redis object cache and must be
+      # active on both standalone and Gluster-backed cluster deployments.
+      ENABLE_LS_CACHE: "true"
       # New environment files set this explicitly: enabled on standalone,
       # disabled on shared-filesystem cluster nodes. Keep the old safe default for
       # legacy environment files, which an installer re-run must not rewrite.
@@ -90,6 +93,9 @@ services:
       - "${DB_SOCKET_DIR}:/run/mysqld:ro"
       - "${DATA_ROOT}/uploads:/var/www/vhosts/localhost/html/wp-content/uploads"
       - "${DATA_ROOT}/cache:/var/www/vhosts/localhost/html/wp-content/cache"
+      # OpenLiteSpeed stores rendered page entries here. DATA_ROOT is the
+      # GlusterFS view in cluster mode, so page cache contents are replicated.
+      - "${DATA_ROOT}/cache/litespeed:/usr/local/lsws/cachedata"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1/"]
       interval: 15s

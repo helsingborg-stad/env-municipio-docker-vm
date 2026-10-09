@@ -47,7 +47,7 @@ The project documentation is published at [https://install.getmunicipio.com/](ht
 
 ```bash
 sudo /scripts/status.municipio.sh
-sudo /scripts/update.municipio.sh ghcr.io/municipio-se/municipio-deployment-docker@sha256:<digest>
+sudo /scripts/update.municipio.sh municipio [VERSION]
 sudo /scripts/backup.municipio.sh manual
 ```
 

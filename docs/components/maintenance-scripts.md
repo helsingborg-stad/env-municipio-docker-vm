@@ -10,7 +10,7 @@ Provide simple local commands for maintenance after the interactive installation
 | --- | --- |
 | `/scripts/status.municipio.sh` | Show container, database, Galera, Gluster, socket and health state. |
 | `/scripts/monitor.municipio.sh [--watch [SECONDS]]` | Draw an ASCII status board for this node and what it can see of its peers, with a fix hint for every problem. |
-| `/scripts/update.municipio.sh DIGEST` | Back up and replace the local app in Compose mode, or roll the shared service across data VMs from the Swarm manager. |
+| `/scripts/update.municipio.sh [municipio [VERSION]]` | Pull a Municipio tag (default `latest`), resolve it to a digest, then back up and replace the local app in Compose mode or roll the shared service across data VMs from the Swarm manager. |
 | `/scripts/maintenance.municipio.sh on\|off` | Remove or return the node from HTTP service. |
 | `/scripts/backup.municipio.sh LABEL` | Dump MariaDB and archive persistent files. |
 | `/scripts/health.municipio.sh` | Recalculate the health marker. |

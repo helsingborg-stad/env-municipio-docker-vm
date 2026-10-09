@@ -141,6 +141,10 @@ grep -Fq "Gluster mount attempt \${attempt} on \${NODE_NAME} (\${NODE_ADDRESS}) 
 grep -Fq "Waiting up to \${CLUSTER_START_WAIT_SECONDS}s for Gluster peer" scripts/cluster.municipio.sh
 grep -Fq 'mount_volume --wait-for-volume' scripts/cluster.municipio.sh
 grep -Fq "Waiting up to \${CLUSTER_START_WAIT_SECONDS}s for Gluster volume municipio to mount" scripts/cluster.municipio.sh
+grep -Fq 'Usage: update.municipio.sh [municipio [VERSION]]' scripts/update.municipio.sh
+grep -Fq "version=\"\${2:-latest}\"" scripts/update.municipio.sh
+grep -Fq 'resolved to an immutable digest' scripts/update.municipio.sh
+grep -Fq '15 3 * * 1 /scripts/update.municipio.sh municipio latest' docs/runbook.md
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.namedotcom' scripts/refresh-sites.municipio.sh

@@ -43,7 +43,7 @@ Set `DOCKER_SWARM=1` to use Swarm instead of Compose. It defaults to `0`. In a t
 
 ## Images
 
-All three services are pinned by digest and `validate_config` rejects mutable tags for every one of them. `update.municipio.sh` likewise requires a digest.
+All three services are pinned by digest and `validate_config` rejects mutable tags for every one of them. `update.municipio.sh municipio [VERSION]` may accept a mutable tag such as `latest`, but resolves it to a digest before saving and deploying it.
 
 Changing `MARIADB_IMAGE` or `CADDY_IMAGE` is a deliberate operator action, not a side effect of an application deployment; there is no automatic database upgrade on image change.
 

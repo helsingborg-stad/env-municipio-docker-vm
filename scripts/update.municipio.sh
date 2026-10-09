@@ -5,14 +5,44 @@ set -euo pipefail
 source /usr/local/lib/municipio/common.sh
 load_config
 
-new_image="${1:-$MUNICIPIO_IMAGE}"
-[[ "$new_image" =~ ^ghcr\.io/municipio-se/municipio-deployment-docker@sha256:[a-f0-9]{64}$ ]] || {
-    echo 'Update requires a digest-pinned ghcr.io Municipio image' >&2
+usage() {
+    cat >&2 <<'EOF'
+Usage: update.municipio.sh [municipio [VERSION]]
+
+Updates the Municipio application container. VERSION defaults to latest; it may be
+any published Municipio image tag, for example 1.2.3 or latest. The pulled tag is
+resolved to an immutable digest before deployment.
+EOF
     exit 2
 }
 
+image_repository='ghcr.io/municipio-se/municipio-deployment-docker'
+target="${1:-municipio}"
+version="${2:-latest}"
+if (($# == 1)) && [[ "$1" =~ ^${image_repository}@sha256:[a-f0-9]{64}$ ]]; then
+    # Compatibility with the previous, digest-only command form.
+    target=municipio
+    new_image="$1"
+elif (($# > 2)); then
+    usage
+else
+    case "$target" in
+        municipio|app) ;;
+        *) die "Unsupported container '$target'. Only municipio is updateable by this command." ;;
+    esac
+    [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die 'VERSION must be an image tag such as latest or 1.2.3'
+    requested_image="${image_repository}:${version}"
+    log "Pulling Municipio image ${requested_image}"
+    docker pull -q "$requested_image"
+    new_image="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$requested_image" | \
+        awk -v repository="$image_repository" '$0 ~ "^" repository "@sha256:[a-f0-9]{64}$" { print; exit }')"
+    [[ "$new_image" =~ ^${image_repository}@sha256:[a-f0-9]{64}$ ]] || \
+        die "Could not resolve ${requested_image} to an immutable digest"
+fi
+
 exec 9>/run/lock/municipio-update.lock
 flock -n 9 || die 'Another update is running'
+log "Deploying Municipio image ${new_image}"
 if [[ "$DOCKER_SWARM" == 1 ]]; then
     swarm_is_manager || die 'Run the Swarm update on the manager'
 else

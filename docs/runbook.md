@@ -102,11 +102,26 @@ Progress is saved in `/etc/municipio/ip-change.state`, and running the script ag
 ## Update the application on one node
 
 ```bash
-sudo /scripts/update.municipio.sh \
-  ghcr.io/municipio-se/municipio-deployment-docker@sha256:<new-digest>
+sudo /scripts/update.municipio.sh municipio [VERSION]
 ```
 
-With Compose, update one node at a time. With Swarm, run the command **once on the manager**; the global service rolls tasks across both data VMs. Application updates never recreate the database container. After every node runs the same digest, drain both nodes briefly and run `cluster.municipio.sh clear-cache --all-nodes-drained` once before returning them to service.
+Omit `VERSION` to deploy `latest`, or supply a published Municipio tag such as `1.2.3`. The script pulls the tag, records its resolved immutable digest in the local configuration, and deploys that digest. With Compose, update one node at a time. With Swarm, run the command **once on the manager**; the global service rolls tasks across both data VMs. Application updates never recreate the database container. After every node runs the same digest, drain both nodes briefly and run `cluster.municipio.sh clear-cache --all-nodes-drained` once before returning them to service.
+
+### Schedule weekly Municipio updates
+
+The update script can be run unattended: it takes a pre-update backup, serializes concurrent runs, verifies the replacement application, and restores the previous image where possible if deployment fails. To update to the current `latest` image every Monday at 03:15 local server time, edit root's crontab:
+
+```bash
+sudo crontab -e
+```
+
+Add this line:
+
+```cron
+15 3 * * 1 /scripts/update.municipio.sh municipio latest >>/var/log/municipio-update.log 2>&1
+```
+
+Review the result after each run with `sudo tail -n 100 /var/log/municipio-update.log` and `sudo /scripts/status.municipio.sh`. In Compose cluster mode, schedule the job on only one data VM at a time, verify it, then schedule the other VM at a different time; do not update both nodes simultaneously. In Swarm mode, schedule it only on the manager. Ensure the VM has enough free space for the pre-update backup and the newly pulled image.
 
 ## Update the MariaDB or Caddy image
 

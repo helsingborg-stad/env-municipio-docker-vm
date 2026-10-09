@@ -11,8 +11,14 @@ CLUSTER_START_WAIT_SECONDS=60
 wait_for_peer() {
     local address="$1" name="$2" started=$SECONDS probe_error
     log "Waiting up to ${CLUSTER_START_WAIT_SECONDS}s for Gluster peer $address"
-    while ! peer_is_connected "$address" "$name"; do
-        probe_error="$(gluster peer probe "$address" 2>&1)" || true
+    while :; do
+        # A successful probe has completed the peer handshake. Do not wait for
+        # `peer status` to render the peer's configured hostname before creating
+        # the volume; hostname rendering differs between Gluster releases.
+        peer_is_connected "$address" "$name" && return 0
+        if probe_error="$(gluster peer probe "$address" 2>&1)"; then
+            return 0
+        fi
         (( SECONDS - started >= CLUSTER_START_WAIT_SECONDS )) && \
             die "Gluster peer $address did not become available within ${CLUSTER_START_WAIT_SECONDS}s. Last reply: ${probe_error}. Check that glusterd is active on the other server and that the Gluster ports are reachable."
         sleep 2

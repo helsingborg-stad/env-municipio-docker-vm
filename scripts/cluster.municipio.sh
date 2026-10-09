@@ -49,12 +49,29 @@ ensure_volume_started() {
 
 mount_volume() {
     local wait_for_volume="${1:-}"
-    local mount_error attempt=0
+    local mount_error volume_info backup_server fstab_line fstab_data_root attempt=0
     [[ -z "$wait_for_volume" || "$wait_for_volume" == --wait-for-volume ]] || \
         die 'mount_volume accepts only --wait-for-volume'
-    grep -qE "^[^#]+[[:space:]]+${DATA_ROOT//\//\\/}[[:space:]]" /etc/fstab || \
-        echo "localhost:/municipio ${DATA_ROOT} glusterfs defaults,_netdev,backupvolfile-server=${SECONDARY_NODE_ADDRESS} 0 0" >> /etc/fstab
-    log "Gluster mount on ${NODE_NAME} (${NODE_ADDRESS}): localhost:/municipio -> ${DATA_ROOT}; backup server ${SECONDARY_NODE_ADDRESS}"
+    if [[ "$NODE_NAME" == "$PRIMARY_NODE_NAME" ]]; then
+        backup_server="$SECONDARY_NODE_ADDRESS"
+    else
+        backup_server="$PRIMARY_NODE_ADDRESS"
+    fi
+    fstab_line="localhost:/municipio ${DATA_ROOT} glusterfs defaults,_netdev,backupvolfile-server=${backup_server} 0 0"
+    fstab_data_root="${DATA_ROOT//\//\\/}"
+    if grep -qE "^[^#]+[[:space:]]+${fstab_data_root}[[:space:]]" /etc/fstab; then
+        # Replace an older entry as well: a secondary must use the primary as its
+        # backup volfile server, not itself.
+        sed -i "\#^[^#].*[[:space:]]${fstab_data_root}[[:space:]].*glusterfs#c\\${fstab_line}" /etc/fstab
+    else
+        echo "$fstab_line" >> /etc/fstab
+    fi
+    log "Gluster mount on ${NODE_NAME} (${NODE_ADDRESS}): localhost:/municipio -> ${DATA_ROOT}; backup server ${backup_server}"
+    if volume_info="$(timeout 5 gluster volume info municipio 2>&1)"; then
+        log "Local Gluster volume definition: $(tr '\n' ' ' <<<"$volume_info")"
+    else
+        log "Local Gluster does not know volume municipio yet: ${volume_info}"
+    fi
     if [[ "$wait_for_volume" == --wait-for-volume ]]; then
         # The secondary can reach this point while the primary is still creating the
         # volume. Retrying here gives Gluster time to receive that definition instead

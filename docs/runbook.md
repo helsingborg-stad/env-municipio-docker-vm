@@ -38,7 +38,21 @@ To install the latest published installer files (such as maintenance scripts, sy
 curl -fsSL https://install.getmunicipio.com/installer.sh | sudo sh
 ```
 
-Confirm the prompt to continue the saved installation. The installer downloads a temporary copy of the latest source bundle and replaces the installed runtime files; it keeps `/etc/municipio/municipio.env`, MariaDB data, uploads and backups. In a two-server cluster, complete the update on one website server before running it on the other, then verify both with `sudo /scripts/status.municipio.sh`. The new version must already be published to the `main` branch for this command to retrieve it.
+Confirm the prompt to continue the saved installation. The installer downloads a temporary copy of the latest source bundle and replaces the installed runtime files; it keeps `/etc/municipio/municipio.env`, MariaDB data, uploads and backups. The new version must already be published to the `main` branch for this command to retrieve it.
+
+For a two-server cluster, use this order:
+
+1. Verify that both nodes are healthy:
+
+   ```bash
+   sudo /scripts/status.municipio.sh
+   ```
+
+2. On website server 2 (the secondary/worker), run the one-liner above and confirm that the saved installation should continue.
+3. On server 2, run `sudo /scripts/status.municipio.sh` again. Continue only when its Gluster mount and peer are connected and Galera is healthy.
+4. Repeat the one-liner on website server 1 (the primary/Swarm manager), then verify its status in the same way.
+
+Do not run the installer on both data servers at the same time. If the wizard says cluster setup is incomplete, do not confirm a new bootstrap or join unless you are deliberately completing the cluster setup procedure.
 
 ## Initialize a two-node cluster
 

@@ -22,9 +22,17 @@ if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
     chown -R 1000:1000 -- "${DATA_ROOT}/uploads"
     find "${DATA_ROOT}/uploads" -type d -exec chmod 0755 {} +
     find "${DATA_ROOT}/uploads" -type f -exec chmod 0644 {} +
+    # WordPress also owns its cache tree. Correct it recursively for the same
+    # reason as uploads, then restore the separate OpenLiteSpeed cache owner.
+    chown -R 1000:1000 -- "${DATA_ROOT}/cache"
+    find "${DATA_ROOT}/cache" -type d -exec chmod 0755 {} +
+    find "${DATA_ROOT}/cache" -type f -exec chmod 0644 {} +
     # OpenLiteSpeed runs as lsadm (994) and stores its rendered page cache here.
     # DATA_ROOT is Gluster-backed in cluster mode, so this cache is replicated too.
     install -d -o 994 -g 994 -m 0755 "${DATA_ROOT}/cache/litespeed"
+    chown -R 994:994 -- "${DATA_ROOT}/cache/litespeed"
+    find "${DATA_ROOT}/cache/litespeed" -type d -exec chmod 0755 {} +
+    find "${DATA_ROOT}/cache/litespeed" -type f -exec chmod 0644 {} +
     install -d -m 0700 "${DATA_ROOT}/caddy"
 else
     install -d -m 0750 "${GLUSTER_BRICK}" "${DATA_ROOT}"

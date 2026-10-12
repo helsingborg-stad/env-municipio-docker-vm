@@ -145,7 +145,15 @@ mount_volume() {
     chown -R 1000:1000 -- "$DATA_ROOT/uploads"
     find "$DATA_ROOT/uploads" -type d -exec chmod 0755 {} +
     find "$DATA_ROOT/uploads" -type f -exec chmod 0644 {} +
+    # WordPress owns the cache except for OpenLiteSpeed's own rendered-page
+    # cache. Repair both trees, preserving the server's UID/GID for that subtree.
+    chown -R 1000:1000 -- "$DATA_ROOT/cache"
+    find "$DATA_ROOT/cache" -type d -exec chmod 0755 {} +
+    find "$DATA_ROOT/cache" -type f -exec chmod 0644 {} +
     install -d -o 994 -g 994 -m 0755 "$DATA_ROOT/cache/litespeed"
+    chown -R 994:994 -- "$DATA_ROOT/cache/litespeed"
+    find "$DATA_ROOT/cache/litespeed" -type d -exec chmod 0755 {} +
+    find "$DATA_ROOT/cache/litespeed" -type f -exec chmod 0644 {} +
     install -d -m 0700 "$DATA_ROOT/caddy"
 }
 

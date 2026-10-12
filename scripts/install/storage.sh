@@ -15,6 +15,13 @@ install -d -o "$DB_SOCKET_UID" -g "$DB_SOCKET_GID" -m 0755 "$DB_SOCKET_DIR"
 
 if [[ "$DEPLOYMENT_MODE" == standalone ]]; then
     install -d -o 1000 -g 1000 -m 0755 "${DATA_ROOT}/uploads" "${DATA_ROOT}/cache"
+    # WordPress runs as UID/GID 1000. `install -d` corrects the top-level
+    # directory, but existing dated upload directories and files may have been
+    # created by root during a previous restore or manual copy. Repair the
+    # complete uploads tree so WordPress can always create its YYYY/MM path.
+    chown -R 1000:1000 -- "${DATA_ROOT}/uploads"
+    find "${DATA_ROOT}/uploads" -type d -exec chmod 0755 {} +
+    find "${DATA_ROOT}/uploads" -type f -exec chmod 0644 {} +
     # OpenLiteSpeed runs as lsadm (994) and stores its rendered page cache here.
     # DATA_ROOT is Gluster-backed in cluster mode, so this cache is replicated too.
     install -d -o 994 -g 994 -m 0755 "${DATA_ROOT}/cache/litespeed"

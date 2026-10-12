@@ -168,7 +168,13 @@ grep -Fq 'ENABLE_LS_CACHE: "true"' compose.swarm.yaml
 grep -Fq 'cache/litespeed:/usr/local/lsws/cachedata' compose.yaml
 grep -Fq 'target: /usr/local/lsws/cachedata' compose.swarm.yaml
 grep -Fq "install -d -o 994 -g 994 -m 0755 \"\${DATA_ROOT}/cache/litespeed\"" scripts/install/storage.sh
+grep -Fq 'chown -R 1000:1000 -- "${DATA_ROOT}/uploads"' scripts/install/storage.sh
+grep -Fq 'find "${DATA_ROOT}/uploads" -type d -exec chmod 0755 {} +' scripts/install/storage.sh
+grep -Fq 'find "${DATA_ROOT}/uploads" -type f -exec chmod 0644 {} +' scripts/install/storage.sh
 grep -Fq "install -d -o 994 -g 994 -m 0755 \"\$DATA_ROOT/cache/litespeed\"" scripts/cluster.municipio.sh
+grep -Fq 'chown -R 1000:1000 -- "$DATA_ROOT/uploads"' scripts/cluster.municipio.sh
+grep -Fq 'find "$DATA_ROOT/uploads" -type d -exec chmod 0755 {} +' scripts/cluster.municipio.sh
+grep -Fq 'find "$DATA_ROOT/uploads" -type f -exec chmod 0644 {} +' scripts/cluster.municipio.sh
 grep -Fq 'external high-availability checker must also reject a stale marker' docs/components/proxy-health.md
 grep -Fq 'storage file_system /data/caddy' scripts/refresh-sites.municipio.sh
 grep -Fq 'dns.providers.loopia' scripts/refresh-sites.municipio.sh

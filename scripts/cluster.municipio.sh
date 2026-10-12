@@ -139,6 +139,12 @@ mount_volume() {
     findmnt -no OPTIONS --target "$DATA_ROOT" | tr ',' '\n' | grep -qx rw || \
         die "DATA_ROOT is read-only: $DATA_ROOT"
     install -d -o 1000 -g 1000 -m 0755 "$DATA_ROOT/uploads" "$DATA_ROOT/cache"
+    # The application writes uploads as UID/GID 1000. Gluster can preserve
+    # root ownership from a restore or a manually copied dated directory, so
+    # fix every existing upload path after the shared volume is mounted.
+    chown -R 1000:1000 -- "$DATA_ROOT/uploads"
+    find "$DATA_ROOT/uploads" -type d -exec chmod 0755 {} +
+    find "$DATA_ROOT/uploads" -type f -exec chmod 0644 {} +
     install -d -o 994 -g 994 -m 0755 "$DATA_ROOT/cache/litespeed"
     install -d -m 0700 "$DATA_ROOT/caddy"
 }

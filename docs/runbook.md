@@ -160,7 +160,7 @@ sudo /scripts/monitor.municipio.sh
 
 Before rebooting the primary, confirm that the secondary's Gluster mount is read/write, both Gluster peers and bricks are connected, and Galera reports two data nodes. Only then patch and reboot the primary. Leave at least 20–30 minutes between independently scheduled reboot windows; a health-gated scheduler is preferable to a fixed delay. With Docker Swarm, reboot the worker/secondary first and the manager/primary last. In an arbitrator deployment, reboot the arbitrator only after both data VMs are healthy.
 
-After each reboot, Caddy intentionally stays unavailable until the local Gluster mount is read/write, preventing it from using the hidden local directory below an unavailable mount. A returning node normally reconnects to Galera and Gluster automatically. Do not reboot a node while `status.municipio.sh` reports `galera_bootstrap=ACTIVE`; complete the [manual failover recovery](failover.md#reattach-a-returning-server) first.
+After each reboot, the Gluster mount waits up to two minutes for its own local brick to report online before it is attempted. Caddy intentionally stays unavailable until that mount is read/write, preventing it from using the hidden local directory below an unavailable mount. Docker also waits for the mount before restoring the application container. A returning node normally reconnects to Galera and Gluster automatically. Do not reboot a node while `status.municipio.sh` reports `galera_bootstrap=ACTIVE`; complete the [manual failover recovery](failover.md#reattach-a-returning-server) first.
 
 ## Update the MariaDB or Caddy image
 

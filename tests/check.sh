@@ -120,6 +120,13 @@ fi
 # the directory only after Gluster has mounted it.
 grep -Fq 'RequiresMountsFor="@CADDY_DATA_ROOT@"' systemd/municipio-caddy.service.in
 grep -Fq 'systemctl enable municipio-caddy.service' scripts/install/maintenance.sh
+grep -Fq 'x-systemd.requires=municipio-gluster-brick.service' scripts/cluster.municipio.sh
+grep -Fq 'gluster volume status municipio "$brick" detail' scripts/wait-for-gluster-brick.municipio.sh
+grep -Fq 'TimeoutStartSec=2min' systemd/municipio-gluster-brick.service
+grep -Fq 'RemainAfterExit=yes' systemd/municipio-gluster-brick.service
+grep -Fq 'After=@DATA_MOUNT_UNIT@' systemd/docker-municipio-data-mount.conf.in
+grep -Fq 'docker.service.d/municipio-data-mount.conf' scripts/install/maintenance.sh
+grep -Fq 'Existing installations already have this fstab entry' scripts/install/maintenance.sh
 grep -Fq "rm -rf /var/lib/glusterd /etc/glusterfs /var/log/glusterfs" uninstaller.sh
 grep -Fq 'Retrying package purge after GlusterFS cleanup' uninstaller.sh
 grep -Fq "tar -C \"\$DATA_ROOT\" -czf \"\$target/files.tar.gz\" uploads cache caddy" scripts/backup.municipio.sh

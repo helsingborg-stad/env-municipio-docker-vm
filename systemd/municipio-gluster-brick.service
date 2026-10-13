@@ -1,0 +1,11 @@
+[Unit]
+Description=Wait for Municipio's local Gluster brick before mounting shared data
+Requires=glusterd.service
+After=glusterd.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=2min
+ExecStart=/scripts/wait-for-gluster-brick.municipio.sh

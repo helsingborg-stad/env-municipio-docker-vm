@@ -27,8 +27,9 @@ BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/municipio}"
 PORT="${APP_BIND_PORT:-8080}"
 
 echo '>> Stopping Municipio systemd units'
-systemctl disable --now municipio-health.timer municipio-health.service municipio-sites.timer municipio-sites.service municipio-caddy.service municipio-swarm-firewall.service garb 2>/dev/null
-rm -f /etc/systemd/system/municipio-health.{service,timer} /etc/systemd/system/municipio-sites.{service,timer} /etc/systemd/system/municipio-caddy.service /etc/systemd/system/municipio-swarm-firewall.service
+systemctl disable --now municipio-health.timer municipio-health.service municipio-sites.timer municipio-sites.service municipio-caddy.service municipio-swarm-firewall.service municipio-gluster-brick.service garb 2>/dev/null
+rm -f /etc/systemd/system/municipio-health.{service,timer} /etc/systemd/system/municipio-sites.{service,timer} /etc/systemd/system/municipio-caddy.service /etc/systemd/system/municipio-swarm-firewall.service /etc/systemd/system/municipio-gluster-brick.service /etc/systemd/system/docker.service.d/municipio-data-mount.conf
+rmdir --ignore-fail-on-non-empty /etc/systemd/system/docker.service.d 2>/dev/null || true
 systemctl daemon-reload
 
 if command -v docker >/dev/null 2>&1; then

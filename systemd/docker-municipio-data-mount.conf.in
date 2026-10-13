@@ -1,0 +1,5 @@
+# Docker restores containers when it starts.  On cluster nodes the application
+# bind mounts must therefore exist before Docker restores municipio-app.
+[Unit]
+Wants=@DATA_MOUNT_UNIT@
+After=@DATA_MOUNT_UNIT@

@@ -98,7 +98,10 @@ mount_volume() {
     else
         backup_server="$PRIMARY_NODE_ADDRESS"
     fi
-    fstab_line="localhost:/municipio ${DATA_ROOT} glusterfs defaults,_netdev,backupvolfile-server=${backup_server} 0 0"
+    # The local brick can come up a few seconds after glusterd.  Tell systemd
+    # to wait for it before attempting this FUSE mount; otherwise an early
+    # mount can remain disconnected for the rest of the boot.
+    fstab_line="localhost:/municipio ${DATA_ROOT} glusterfs defaults,_netdev,backupvolfile-server=${backup_server},x-systemd.requires=municipio-gluster-brick.service 0 0"
     fstab_data_root="${DATA_ROOT//\//\\/}"
     if grep -qE "^[^#]+[[:space:]]+${fstab_data_root}[[:space:]]" /etc/fstab; then
         # Replace an older entry as well: a secondary must use the primary as its
